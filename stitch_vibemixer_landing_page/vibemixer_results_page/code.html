@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>VibeMixer Results</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings:
+            'FILL' 0,
+            'wght' 400,
+            'GRAD' 0,
+            'opsz' 24
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#2bee79",
+              "background-light": "#f6f8f7",
+              "background-dark": "#121212",
+              "spotify-green": "#1DB954",
+              "youtube-red": "#FF0000",
+              "vibemixer-purple": "#8A2BE2",
+            },
+            fontFamily: {
+              "display": ["Space Grotesk", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.5rem", "lg": "0.75rem", "xl": "1rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-display bg-background-light dark:bg-background-dark">
+<div class="relative flex h-auto min-h-screen w-full flex-col">
+<!-- Top App Bar -->
+<header class="flex items-center p-4 pb-2 justify-between sticky top-0 z-10 bg-background-light dark:bg-background-dark/80 backdrop-blur-sm">
+<button class="text-white flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-2xl">arrow_back</span>
+</button>
+<h1 class="text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">VibeMixer</h1>
+<div class="flex size-10 shrink-0 items-center"></div>
+</header>
+<main class="flex-1 px-4 py-6">
+<!-- Headline Text -->
+<div class="text-center pb-8">
+<h2 class="text-white tracking-light text-[32px] font-bold leading-tight">Your Vibe is Ready!</h2>
+</div>
+<div class="flex flex-col gap-6">
+<!-- Spotify Card -->
+<div class="flex flex-col items-stretch justify-start rounded-xl bg-white/5 p-4">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg mb-4" data-alt="Abstract gradient of green and black representing a Spotify playlist cover" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCj3u29lXI-vpHKt_Jnjc9iRuQE7bKzWJuErl3rpCR0ATOmpLk9Eq-Yfkp3l0Xf6fVDtFb3PvEyTd40yfRQ5IClgkx_FIDzlH0u9CLBouv6t0vHP5D_-1zkO5KeciFKB6QqrQSjjxQLF_xJGG38yD5PKoX55oapoJXKfJgviHYbBHEeAwcKf8jg3RfX4bp-Dt9zlmJ8blguw7XepZu9e_ss1sm0YKszbiz3DzBeAOTvuPG2qc5nIz_vz0LX7X1CbW_kilaRV9JxlWPR");'></div>
+<div class="flex w-full min-w-72 grow flex-col items-stretch justify-center gap-2">
+<p class="text-white text-xl font-bold leading-tight tracking-[-0.015em]">Spotify Playlist</p>
+<p class="text-neutral-400 text-base font-normal leading-normal">20 Calm Focus Tracks</p>
+<button class="flex mt-2 min-w-[84px] max-w-[480px] w-full cursor-pointer items-center justify-center overflow-hidden rounded-full h-12 px-4 bg-spotify-green text-white text-base font-bold leading-normal tracking-wide transition-transform hover:scale-105">
+<span class="truncate">Open in Spotify</span>
+</button>
+</div>
+</div>
+<!-- YouTube Card -->
+<div class="flex flex-col items-stretch justify-start rounded-xl bg-white/5 p-4">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg mb-4" data-alt="Abstract gradient of red, white, and black representing a YouTube playlist cover" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuD6LUSKJ00ffdejWKtcEJg6i9JY2WX_l35hPv3ReFabiSnN_NZZoMfrOczzuAW9770ahAtV0Tq2ZAwaeRSwS82HT8jlDQRgKQmRfHCHKXRJl9Da-_VifINMddMfIdi1zoM-6LpxBprK-K5ty7g6JkQSGWJyW2oI3wxRlCZRsZM6HGpab3QMbUgT3I7eQBMfmGsveekv_YY9VxNH1JgzzM8a-tg15IWRZD2Q7ZikU4gQNnvZjX6__JbJyR9sI-FV3a6rtUIAQ-tHnHpI");'></div>
+<div class="flex w-full min-w-72 grow flex-col items-stretch justify-center gap-2">
+<p class="text-white text-xl font-bold leading-tight tracking-[-0.015em]">YouTube Playlist</p>
+<p class="text-neutral-400 text-base font-normal leading-normal">A curated video playlist for focus</p>
+<button class="flex mt-2 min-w-[84px] max-w-[480px] w-full cursor-pointer items-center justify-center overflow-hidden rounded-full h-12 px-4 bg-youtube-red text-white text-base font-bold leading-normal tracking-wide transition-transform hover:scale-105">
+<span class="truncate">Watch on YouTube</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Optional AI Cover Art Grid -->
+<div class="mt-12">
+<h3 class="text-neutral-300 text-lg font-bold text-center mb-4">AI Generated Cover Art</h3>
+<div class="grid grid-cols-2 gap-4">
+<div class="flex flex-col gap-3 items-center">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg" data-alt="AI generated art with swirling green and black patterns" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDO6ZTZWWM6wmqtQ2nnYnltbyxUN8pbw9SVHGux_d6qOF_d77vZDED6s7wOsxcVfXIldBGUv8311vq3VmEz7VDEf4EUyczKz5MMNfRClhIiGQytolQuUylUaUsvx13p9YYlJP7oPOPnj8td_Jn_vysk-mYp5mpmP_FwFN1UItpe0TgSZ0gcfkpWQFJc27Xf4xZXOrXxVqYgwgZ1VAGErjD3T20ku7BIzNftPSWjsOtgPpMUuRIRbcz4aw6rgNOJPNiMVhBiVFKdlFea");'></div>
+<button class="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors">
+<span class="material-symbols-outlined text-lg">download</span>
+<span class="text-sm">Download</span>
+</button>
+</div>
+<div class="flex flex-col gap-3 items-center">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg" data-alt="AI generated art with abstract red and white shapes" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAyFdPfHN3Aq3FpPUSz-m8q3I4pnh2M8iUAITGnePfAkira4RGug-EG-L4FRSDGd30BrioDeVTzLUER3LZfP1F72TM1HRwMctyMrM9fJ9EnNn_E6mR8Ys19yi4YLK1T8k90dwaCTrOrmRQU7_ZSg2JPpVPPld6tTZgxq3Vh0zFcaRhFgiUX9EZLU02MaYH9tSwrR6UHMcbiCjYjDamrhBJOk7e90CU6dXrarUJlJHOn0wMYft1ouvPSQ2_KA4cfl6w887oQhnMKvI_W");'></div>
+<button class="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors">
+<span class="material-symbols-outlined text-lg">download</span>
+<span class="text-sm">Download</span>
+</button>
+</div>
+</div>
+</div>
+<!-- New Vibe Button -->
+<div class="pt-12 pb-6 text-center">
+<button class="cursor-pointer text-vibemixer-purple text-base font-bold leading-normal tracking-wide hover:underline">Generate a new Vibe</button>
+</div>
+</main>
+</div>
+</body></html>
