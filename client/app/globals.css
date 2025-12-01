@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #8A2BE2;
+  --color-background-light: #f6f8f7;
+  --color-background-dark: #121212;
+  --color-spotify: #1DB954;
+  --color-youtube: #FF0000;
+  --color-surface-dark: #1d1d1d;
+  --color-vibemixer-purple: #8A2BE2;
+
+  --font-display: var(--font-space-grotesk);
+}
+
+/* Material Symbols settings */
+.material-symbols-outlined {
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+}
+
+@layer base {
+  body {
+    @apply bg-background-light dark:bg-background-dark text-gray-900 dark:text-white font-display;
+  }
+}
