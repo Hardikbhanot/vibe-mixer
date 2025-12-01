@@ -1,0 +1,120 @@
+import Link from "next/link";
+import { ThemeToggle } from "@/components/ThemeToggle";
+
+export default function Home() {
+  return (
+    <div className="relative flex min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+      {/* TopAppBar */}
+      <header className="flex items-center p-4 justify-between sticky top-0 z-10 bg-background-dark/80 backdrop-blur-sm">
+        <h1 className="text-white text-xl font-bold leading-tight tracking-[-0.015em] flex-1">
+          VibeMixer
+        </h1>
+        <div className="flex items-center justify-end gap-3">
+          <ThemeToggle />
+          <button className="flex items-center justify-center size-10 rounded-full bg-spotify text-white">
+            <img
+              alt="Spotify logo"
+              className="w-6 h-6"
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAA3JV1ZFdWQIi3t5elUETdCTJ-7sC1ySLkuhc8Qu72PGsGKeoK7l_C_bJXVceUvJaWU2qSu0zCMSlyqnxADMoWrxSLRHAEoFTnqFikfFtyJbdghRDzP4U9ffL4pW5jMLiF6foSn2hTCTm4reuNzheOi3UpOJvnD-y2AwLclR89Np4IZETdza4nKOuOdAWlvT-wTQz2IHJm7l6QyjYYI79Zl0j6KEgrRW1eXUpIxS5Es7n6FD-ww8rtIiTSufXzepHYTn-pHPKG3OlA"
+            />
+          </button>
+          <button className="flex items-center justify-center size-10 rounded-full bg-white text-youtube">
+            <img
+              alt="Google logo"
+              className="w-6 h-6"
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBRZA9edMsl0HlmUrIaBLPfs2qrytXsYBSAMzeOKvKbLm1FwV7LP6pSMba8mrvL-pDoRbgafl_znY6CAxRF006zfqZtDBkbEQm6hhjeojkllCzvIApyoTk0IQn6I8T71zj6urOv0WsTMOLayScQ_vNUJG0ZPdfmDUylzwd028H70HniZ1V6Vq--sibDw8m9NQjwvSC-PWr_7qyhK405wVBtt1pbmnMRMnjjJCO1uq0UyjhZ20qrcwfTQxALJBEz-pLDVCtE_xYFweF5"
+            />
+          </button>
+        </div>
+      </header>
+
+      <main className="flex-grow">
+        {/* HeroSection */}
+        <div className="px-4 py-16 text-center">
+          <div className="flex flex-col gap-2">
+            <h2 className="text-white text-4xl font-black leading-tight tracking-[-0.033em] sm:text-5xl">
+              Your Mood. Your Mix. Instantly.
+            </h2>
+            <p className="text-white/80 text-base font-normal leading-normal max-w-md mx-auto">
+              Let our AI curate the perfect playlist from Spotify and YouTube
+              based on how you feel right now.
+            </p>
+          </div>
+        </div>
+
+        {/* FeatureSection */}
+        <div className="flex flex-col gap-8 px-4 py-10">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 max-w-5xl mx-auto">
+            <div className="flex items-start gap-4 rounded-xl bg-white/5 p-4">
+              <div className="text-primary mt-1">
+                <span className="material-symbols-outlined !text-3xl">
+                  psychology
+                </span>
+              </div>
+              <div className="flex flex-col gap-1 text-left">
+                <h3 className="text-white text-lg font-bold leading-tight">
+                  AI Mood Analysis
+                </h3>
+                <p className="text-white/70 text-sm font-normal leading-normal">
+                  Our smart AI understands your vibe and finds the perfect
+                  tracks to match.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4 rounded-xl bg-white/5 p-4">
+              <div className="text-primary mt-1">
+                <span className="material-symbols-outlined !text-3xl">
+                  sync
+                </span>
+              </div>
+              <div className="flex flex-col gap-1 text-left">
+                <h3 className="text-white text-lg font-bold leading-tight">
+                  Spotify & YouTube Sync
+                </h3>
+                <p className="text-white/70 text-sm font-normal leading-normal">
+                  Connect your favorite streaming services for an endless
+                  library of music.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4 rounded-xl bg-white/5 p-4">
+              <div className="text-primary mt-1">
+                <span className="material-symbols-outlined !text-3xl">
+                  queue_music
+                </span>
+              </div>
+              <div className="flex flex-col gap-1 text-left">
+                <h3 className="text-white text-lg font-bold leading-tight">
+                  Instant Playlists
+                </h3>
+                <p className="text-white/70 text-sm font-normal leading-normal">
+                  Get curated playlists created for you in seconds, ready to
+                  play and enjoy.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* CTASection */}
+        <div className="px-4 py-10">
+          <div className="flex flex-col items-center justify-center gap-6">
+            <Link
+              href="/generate"
+              className="flex w-full max-w-sm cursor-pointer items-center justify-center overflow-hidden rounded-full h-14 px-5 bg-primary text-white text-base font-bold leading-normal tracking-[0.015em] hover:bg-primary/90 transition-colors"
+            >
+              <span className="truncate">Start Mixing Your Vibe</span>
+            </Link>
+          </div>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="flex flex-col gap-6 px-5 py-10 text-center">
+        <p className="text-white/60 text-sm font-normal leading-normal">
+          © 2024 VibeMixer. All Rights Reserved.
+        </p>
+      </footer>
+    </div>
+  );
+}
