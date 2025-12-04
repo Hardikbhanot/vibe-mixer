@@ -38,11 +38,15 @@ router.get('/callback', async (req, res) => {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             maxAge: expires_in * 1000,
+            path: '/',
+            sameSite: 'lax'
         });
 
         res.cookie('spotify_refresh_token', refresh_token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
+            path: '/',
+            sameSite: 'lax'
         });
 
         // Redirect back to frontend
@@ -50,6 +54,83 @@ router.get('/callback', async (req, res) => {
     } catch (error) {
         console.error('Error during Spotify authentication:', error);
         res.redirect('http://127.0.0.1:3000/?error=auth_failed');
+    }
+});
+
+// --- Google / YouTube Auth ---
+
+router.get('/google', (req, res) => {
+    console.log('[Google Auth] Initiating...');
+    console.log('[Google Auth] Client ID:', process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.substring(0, 10) + '...' : 'MISSING');
+    console.log('[Google Auth] Redirect URI:', 'http://127.0.0.1:4000/auth/google/callback');
+
+    const scopes = [
+        'https://www.googleapis.com/auth/youtube',
+        'https://www.googleapis.com/auth/userinfo.profile'
+    ];
+
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent('http://127.0.0.1:4000/auth/google/callback')}&response_type=code&scope=${encodeURIComponent(scopes.join(' '))}&access_type=offline&prompt=consent`;
+
+    console.log('[Google Auth] Generated URL:', url);
+
+    res.redirect(url);
+});
+
+router.get('/google/callback', async (req, res) => {
+    const code = req.query.code || null;
+
+    if (!code) {
+        return res.redirect('http://127.0.0.1:3000/results?error=google_auth_failed');
+    }
+
+    try {
+        const response = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                code: code,
+                client_id: process.env.GOOGLE_CLIENT_ID,
+                client_secret: process.env.GOOGLE_CLIENT_SECRET,
+                redirect_uri: 'http://127.0.0.1:4000/auth/google/callback',
+                grant_type: 'authorization_code',
+            }),
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            console.error('Google Token Error:', data);
+            return res.redirect('http://127.0.0.1:3000/results?error=google_token_error');
+        }
+
+        const { access_token, refresh_token, expires_in } = data;
+
+        // Set tokens in cookies
+        res.cookie('google_access_token', access_token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: expires_in * 1000,
+            path: '/',
+            sameSite: 'lax'
+        });
+
+        if (refresh_token) {
+            res.cookie('google_refresh_token', refresh_token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                path: '/',
+                sameSite: 'lax'
+            });
+        }
+
+        // Redirect back to results page (assuming that's where they clicked "Connect YouTube")
+        res.redirect('http://127.0.0.1:3000/results?google_connected=true');
+
+    } catch (error) {
+        console.error('Google Auth Error:', error);
+        res.redirect('http://127.0.0.1:3000/results?error=server_error');
     }
 });
 
