@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -12,33 +12,60 @@ export default function GeneratePage() {
     const [energy, setEnergy] = useState(50);
     const [tempo, setTempo] = useState(75);
     const [valence, setValence] = useState(30);
+    const [duration, setDuration] = useState(60); // Default 60 minutes
+    const [vibeType, setVibeType] = useState<'offbeat' | 'popular' | 'mix'>('mix');
     const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        if (window.location.hostname === 'localhost') {
+            window.location.href = window.location.href.replace('localhost', '127.0.0.1');
+        }
+    }, []);
 
     const handleGenerate = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch('http://127.0.0.1:4000/spotify/search', {
+            // 1. Analyze mood with AI (Groq)
+            const response = await fetch('http://127.0.0.1:4000/ai/analyze', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ query: mood }),
-                credentials: 'include', // Important to send cookies
+                body: JSON.stringify({
+                    mood,
+                    duration, // Send duration in minutes
+                    vibeType, // Send vibe preference
+                    energy,
+                    tempo,
+                    valence
+                }),
+                credentials: 'include',
             });
 
-            if (!response.ok) {
-                throw new Error('Failed to fetch tracks');
+            if (response.status === 401) {
+                // Token expired or missing (e.g. cookies cleared)
+                // Redirect to login to re-authenticate
+                window.location.href = 'http://127.0.0.1:4000/auth/login';
+                return;
             }
 
-            const data = await response.json();
-            console.log('Tracks found:', data);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to analyze mood');
+            }
 
-            // For now, just redirect to results after successful fetch
-            // In a real app, we'd pass this data to the results page
-            router.push("/results");
+            const aiData = await response.json();
+            console.log('AI Analysis Result:', aiData);
+
+            // Save to localStorage for the results page
+            console.log('Saving to localStorage: playlistData', aiData);
+            localStorage.setItem('playlistData', JSON.stringify(aiData));
+
+            router.push('/results');
+
         } catch (error) {
             console.error('Error generating mix:', error);
-            alert('Failed to generate mix. Please make sure you are logged in.');
+            alert('Failed to generate mix. Check console for details.');
         } finally {
             setIsLoading(false);
         }
@@ -47,16 +74,19 @@ export default function GeneratePage() {
     return (
         <div className="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden antialiased">
             {/* Top App Bar */}
-            <header className="flex items-center bg-background-dark p-4 pb-2 justify-between sticky top-0 z-10">
-                <div className="flex size-12 shrink-0 items-center justify-start text-white/60">
+            <header className="flex items-center bg-background-light dark:bg-background-dark p-4 pb-2 justify-between sticky top-0 z-10 transition-colors duration-300">
+                <div className="flex size-12 shrink-0 items-center justify-start text-foreground/60">
                     <Link href="/" className="flex items-center justify-center">
                         <span className="material-symbols-outlined text-3xl">arrow_back</span>
                     </Link>
                 </div>
-                <h1 className="text-white text-xl font-bold leading-tight tracking-[-0.015em] flex-1 text-center">
-                    VibeMixer
-                </h1>
-                <div className="flex size-12 shrink-0 items-center justify-end text-white/60 gap-2">
+                <div className="flex items-center gap-2 flex-1 justify-center">
+                    <img src="/logo.png" alt="Logo" className="w-12 h-12 object-contain" />
+                    <h1 className="text-foreground text-3xl font-bold leading-tight tracking-[-0.015em]">
+                        VibeMixer
+                    </h1>
+                </div>
+                <div className="flex size-12 shrink-0 items-center justify-end text-foreground/60 gap-2">
                     <ThemeToggle />
                     <span className="material-symbols-outlined text-3xl">more_vert</span>
                 </div>
@@ -64,20 +94,20 @@ export default function GeneratePage() {
 
             <main className="flex flex-col flex-1 px-4 py-6 space-y-8 max-w-xl mx-auto w-full">
                 {/* Headline Text */}
-                <h2 className="text-white tracking-light text-[32px] font-bold leading-tight text-center pb-2 pt-4">
+                <h2 className="text-foreground tracking-light text-[32px] font-bold leading-tight text-center pb-2 pt-4">
                     Craft Your Perfect Mix
                 </h2>
 
                 {/* Text Field */}
                 <div className="flex flex-col w-full">
                     <label className="flex flex-col min-w-40 flex-1">
-                        <p className="text-white/80 text-base font-medium leading-normal pb-2">
+                        <p className="text-foreground/80 text-base font-medium leading-normal pb-2">
                             Tell VibeMixer your vibe
                         </p>
                         <textarea
                             value={mood}
                             onChange={(e) => setMood(e.target.value)}
-                            className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border-white/20 bg-surface-dark min-h-36 placeholder:text-white/40 p-4 text-base font-normal leading-normal"
+                            className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-foreground focus:outline-0 focus:ring-2 focus:ring-primary/50 border-border bg-surface-light dark:bg-surface-dark min-h-36 placeholder:text-muted-foreground p-4 text-base font-normal leading-normal"
                             placeholder="e.g., 'Rainy day coding music' or 'High-energy 90s hip-hop workout.'"
                         ></textarea>
                     </label>
@@ -89,7 +119,7 @@ export default function GeneratePage() {
                         <div className="text-white flex items-center justify-center rounded-lg bg-surface-dark shrink-0 size-10">
                             <span className="material-symbols-outlined">tune</span>
                         </div>
-                        <p className="text-white text-base font-medium leading-normal flex-1 truncate">
+                        <p className="text-foreground text-base font-medium leading-normal flex-1 truncate">
                             Advanced Mode
                         </p>
                     </div>
@@ -111,14 +141,74 @@ export default function GeneratePage() {
                 {/* Advanced Controls Sliders */}
                 {isAdvanced && (
                     <div className="flex flex-col space-y-6 pt-2 animate-in fade-in slide-in-from-top-4 duration-300">
+
+                        {/* Vibe Type Selection */}
+                        <div className="flex flex-col gap-3">
+                            <p className="text-foreground text-base font-medium leading-normal">
+                                Vibe Type
+                            </p>
+                            <div className="grid grid-cols-3 gap-2">
+                                <button
+                                    onClick={() => setVibeType('offbeat')}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${vibeType === 'offbeat'
+                                        ? 'bg-primary text-background-dark'
+                                        : 'bg-surface-dark text-white hover:bg-white/10'
+                                        }`}
+                                >
+                                    Offbeat
+                                </button>
+                                <button
+                                    onClick={() => setVibeType('popular')}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${vibeType === 'popular'
+                                        ? 'bg-primary text-background-dark'
+                                        : 'bg-surface-dark text-white hover:bg-white/10'
+                                        }`}
+                                >
+                                    Popular
+                                </button>
+                                <button
+                                    onClick={() => setVibeType('mix')}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${vibeType === 'mix'
+                                        ? 'bg-primary text-background-dark'
+                                        : 'bg-surface-dark text-white hover:bg-white/10'
+                                        }`}
+                                >
+                                    Mix
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Duration Slider */}
+                        <div className="@container">
+                            <div className="relative flex w-full flex-col items-start justify-between gap-3">
+                                <div className="flex w-full shrink-[3] items-center justify-between">
+                                    <p className="text-foreground text-base font-medium leading-normal">
+                                        Duration
+                                    </p>
+                                    <p className="text-foreground/70 text-sm font-normal leading-normal">
+                                        {duration} mins
+                                    </p>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="15"
+                                    max="180"
+                                    step="5"
+                                    value={duration}
+                                    onChange={(e) => setDuration(Number(e.target.value))}
+                                    className="w-full h-2 bg-surface-dark rounded-lg appearance-none cursor-pointer accent-white"
+                                />
+                            </div>
+                        </div>
+
                         {/* Energy Slider */}
                         <div className="@container">
                             <div className="relative flex w-full flex-col items-start justify-between gap-3">
                                 <div className="flex w-full shrink-[3] items-center justify-between">
-                                    <p className="text-white text-base font-medium leading-normal">
+                                    <p className="text-foreground text-base font-medium leading-normal">
                                         Energy
                                     </p>
-                                    <p className="text-white/70 text-sm font-normal leading-normal">
+                                    <p className="text-foreground/70 text-sm font-normal leading-normal">
                                         {energy}%
                                     </p>
                                 </div>
@@ -137,10 +227,10 @@ export default function GeneratePage() {
                         <div className="@container">
                             <div className="relative flex w-full flex-col items-start justify-between gap-3">
                                 <div className="flex w-full shrink-[3] items-center justify-between">
-                                    <p className="text-white text-base font-medium leading-normal">
+                                    <p className="text-foreground text-base font-medium leading-normal">
                                         Tempo
                                     </p>
-                                    <p className="text-white/70 text-sm font-normal leading-normal">
+                                    <p className="text-foreground/70 text-sm font-normal leading-normal">
                                         {tempo}%
                                     </p>
                                 </div>
@@ -159,10 +249,10 @@ export default function GeneratePage() {
                         <div className="@container">
                             <div className="relative flex w-full flex-col items-start justify-between gap-3">
                                 <div className="flex w-full shrink-[3] items-center justify-between">
-                                    <p className="text-white text-base font-medium leading-normal">
+                                    <p className="text-foreground text-base font-medium leading-normal">
                                         Valence (Positivity)
                                     </p>
-                                    <p className="text-white/70 text-sm font-normal leading-normal">
+                                    <p className="text-foreground/70 text-sm font-normal leading-normal">
                                         {valence}%
                                     </p>
                                 </div>
