@@ -1,10 +1,16 @@
 "use client";
-export const dynamic = 'force-dynamic';
+
 
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation"; // Removed useSearchParams
+
+// Type for the searchParams prop, allowing for string or string array values
+interface SearchParams {
+    [key: string]: string | string[] | undefined;
+}
+
 
 interface Track {
     id: string;
@@ -27,9 +33,10 @@ interface PlaylistData {
     total_duration_mins?: number;
 }
 
-export default function ResultsPage() {
+// The function signature is updated to accept the searchParams prop from the Server Component.
+export default function ResultsPage({ searchParams }: { searchParams: SearchParams }) {
     const router = useRouter();
-    const searchParams = useSearchParams();
+    
     const [data, setData] = useState<PlaylistData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -39,6 +46,7 @@ export default function ResultsPage() {
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
     useEffect(() => {
+        // NOTE: This localhost redirect logic might also cause issues on Vercel/Cloud Shell.
         if (window.location.hostname === 'localhost') {
             window.location.href = window.location.href.replace('localhost', '127.0.0.1');
             return;
@@ -67,18 +75,19 @@ export default function ResultsPage() {
         }
         setLoading(false);
 
-        // Check for Google Auth success
-        const googleConnected = searchParams.get('google_connected');
+        // Access searchParams from props here
+        const googleConnected = searchParams.google_connected;
         if (googleConnected) {
             // Remove the query param to clean up URL
             window.history.replaceState({}, '', '/results');
             // Maybe show a toast?
         }
-    }, [searchParams]);
+    }, [searchParams]); // Depend on the searchParams prop
 
     const generateCoverImage = async (prompt: string) => {
         setIsGeneratingImage(true);
         try {
+            // NOTE: Replace 'http://127.0.0.1:4000' with your actual deployed backend URL
             const response = await fetch('http://127.0.0.1:4000/ai/image', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -90,7 +99,6 @@ export default function ResultsPage() {
             }
         } catch (error) {
             console.error('Failed to generate image:', error);
-            // Fallback to Pollinations if backend fails? Or just show placeholder?
         } finally {
             setIsGeneratingImage(false);
         }
@@ -103,6 +111,7 @@ export default function ResultsPage() {
             // Use generated image or fallback to Pollinations URL
             const finalCoverImage = coverImage || `https://image.pollinations.ai/prompt/${encodeURIComponent(data.cover_art_description || data.playlist_name)}?width=512&height=512&nologo=true`;
 
+            // NOTE: Replace 'http://127.0.0.1:4000' with your actual deployed backend URL
             const response = await fetch('http://127.0.0.1:4000/spotify/playlist', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -131,6 +140,7 @@ export default function ResultsPage() {
         if (!data) return;
         setIsSavingYoutube(true);
         try {
+            // NOTE: Replace 'http://127.0.0.1:4000' with your actual deployed backend URL
             const response = await fetch('http://127.0.0.1:4000/youtube/playlist', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -144,6 +154,7 @@ export default function ResultsPage() {
 
             if (response.status === 401) {
                 // Redirect to Google Auth
+                // NOTE: Replace 'http://127.0.0.1:4000' with your actual deployed backend URL
                 window.location.href = 'http://127.0.0.1:4000/auth/google';
                 return;
             }
