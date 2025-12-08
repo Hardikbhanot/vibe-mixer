@@ -21,6 +21,7 @@ const scopes = [
 
 // Route to initiate login
 router.get('/login', (req, res) => {
+    console.log('[Spotify Auth] Redirect URI:', process.env.SPOTIFY_REDIRECT_URI);
     const authorizeURL = spotifyApi.createAuthorizeURL(scopes);
     res.redirect(authorizeURL);
 });
