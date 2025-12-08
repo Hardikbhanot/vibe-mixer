@@ -111,3 +111,49 @@ export const getRegionalVibeQuery = async (region) => {
         return { searchQuery: `Best ${region} songs india` };
     }
 };
+
+export const analyzeImage = async (base64Image, mimeType = 'image/jpeg') => {
+    console.log(`[Groq] Analyzing image (${mimeType}) with Vision model...`);
+
+    const prompt = `
+    Analyze this image and describe the mood, atmosphere, and visual aesthetic in 3-4 concise keywords suitable for a music playlist.
+    Examples: "Melancholic rainy jazz", "Neon cyberpunk synthwave", "Sunny acoustic roadtrip".
+    Return ONLY the keywords, separated by spaces or commas. Do not write sentences or descriptions.
+    `;
+
+    try {
+        const completion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: prompt },
+                        {
+                            type: "image_url",
+                            image_url: {
+                                url: `data:${mimeType};base64,${base64Image}`,
+                            },
+                        },
+                    ],
+                },
+            ],
+            model: "meta-llama/llama-4-scout-17b-16e-instruct",
+            temperature: 0.5,
+            max_tokens: 50,
+        });
+
+        const moodDescription = completion.choices[0]?.message?.content?.trim();
+        console.log('[Groq] Image Analysis Result:', moodDescription);
+        return moodDescription || "Eclectic mix";
+    } catch (error) {
+        console.error("Groq Vision API Error Details:", {
+            message: error.message,
+            type: error.type,
+            code: error.code,
+            param: error.param,
+            response: error.error // Groq SDK often puts the API error detail here
+        });
+        console.error("Image Payload Size:", base64Image.length);
+        throw error;
+    }
+};
