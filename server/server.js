@@ -14,6 +14,9 @@ import youtubeRoutes from './routes/youtube.js';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// Trust Proxy for Heroku (required for secure cookies)
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(cors({
   origin: [

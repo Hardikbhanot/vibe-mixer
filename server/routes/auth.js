@@ -37,17 +37,17 @@ router.get('/callback', async (req, res) => {
         // Set tokens in cookies (httpOnly for security)
         res.cookie('spotify_access_token', access_token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true, // Always true for SameSite=None
             maxAge: expires_in * 1000,
             path: '/',
-            sameSite: 'lax'
+            sameSite: 'none'
         });
 
         res.cookie('spotify_refresh_token', refresh_token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true,
             path: '/',
-            sameSite: 'lax'
+            sameSite: 'none'
         });
 
         // Redirect back to frontend
@@ -116,18 +116,18 @@ router.get('/google/callback', async (req, res) => {
         // Set tokens in cookies
         res.cookie('google_access_token', access_token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true,
             maxAge: expires_in * 1000,
             path: '/',
-            sameSite: 'lax'
+            sameSite: 'none'
         });
 
         if (refresh_token) {
             res.cookie('google_refresh_token', refresh_token, {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
+                secure: true,
                 path: '/',
-                sameSite: 'lax'
+                sameSite: 'none'
             });
         }
 
