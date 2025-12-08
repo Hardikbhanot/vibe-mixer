@@ -118,7 +118,7 @@ export default function Home() {
 
                 <footer className="flex justify-center p-4 border-t border-border">
                     <p className="text-muted-foreground text-sm font-normal leading-normal">
-                        © 2024 VibeMixer
+                        © 2025 VibeMixer
                     </p>
                 </footer>
             </div>
