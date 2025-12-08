@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+// --- Types ---
 interface Track {
     id: string;
     name: string;
@@ -26,9 +27,12 @@ interface PlaylistData {
     total_duration_mins?: number;
 }
 
-export default function ResultsPage() {
+// --- Inner Component (Contains the Logic) ---
+// We move the main logic here so we can wrap it in Suspense later
+function ResultsContent() {
     const router = useRouter();
-    const searchParams = useSearchParams();
+    const searchParams = useSearchParams(); // ✅ Safe to use here because this component will be wrapped in Suspense
+
     const [data, setData] = useState<PlaylistData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -38,9 +42,10 @@ export default function ResultsPage() {
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
     useEffect(() => {
-        if (window.location.hostname === 'localhost') {
-            window.location.href = window.location.href.replace('localhost', '127.0.0.1');
-            return;
+        // Fix for localhost redirect issue on Vercel
+        if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+            // Only redirect if we are actually on localhost, not in production
+            // This prevents Vercel build errors or loops
         }
 
         const storedData = localStorage.getItem('playlistData');
@@ -49,7 +54,6 @@ export default function ResultsPage() {
         if (storedData) {
             try {
                 const parsed = JSON.parse(storedData);
-                console.log('Parsed data:', parsed);
                 setData(parsed);
 
                 // Trigger image generation if we have a description
@@ -69,9 +73,7 @@ export default function ResultsPage() {
         // Check for Google Auth success
         const googleConnected = searchParams.get('google_connected');
         if (googleConnected) {
-            // Remove the query param to clean up URL
             window.history.replaceState({}, '', '/results');
-            // Maybe show a toast?
         }
     }, [searchParams]);
 
@@ -87,7 +89,10 @@ export default function ResultsPage() {
     const generateCoverImage = async (prompt: string) => {
         setIsGeneratingImage(true);
         try {
-            const response = await fetch('http://127.0.0.1:4000/ai/image', {
+            // Use relative path for API calls or ENV variable in production
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+
+            const response = await fetch(`${apiUrl}/ai/image`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ prompt }),
@@ -110,10 +115,10 @@ export default function ResultsPage() {
         if (!data) return;
         setIsSaving(true);
         try {
-            // Use generated image or fallback to Pollinations URL
             const finalCoverImage = coverImage || `https://image.pollinations.ai/prompt/${encodeURIComponent(data.cover_art_description || data.playlist_name)}?width=512&height=512&nologo=true`;
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
 
-            const response = await fetch('http://127.0.0.1:4000/spotify/playlist', {
+            const response = await fetch(`${apiUrl}/spotify/playlist`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -144,7 +149,9 @@ export default function ResultsPage() {
         if (!data) return;
         setIsSavingYoutube(true);
         try {
-            const response = await fetch('http://127.0.0.1:4000/youtube/playlist', {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+
+            const response = await fetch(`${apiUrl}/youtube/playlist`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -156,8 +163,7 @@ export default function ResultsPage() {
             });
 
             if (response.status === 401) {
-                // Redirect to Google Auth
-                window.location.href = 'http://127.0.0.1:4000/auth/google';
+                window.location.href = `${apiUrl}/auth/google`;
                 return;
             }
 
@@ -195,7 +201,6 @@ export default function ResultsPage() {
         );
     }
 
-    // Use state image or fallback
     const displayImage = coverImage || `https://image.pollinations.ai/prompt/${encodeURIComponent(data.cover_art_description || data.playlist_name)}?width=512&height=512&nologo=true`;
 
     return (
@@ -316,13 +321,27 @@ export default function ResultsPage() {
                 {/* Toast Notification */}
                 {toast && (
                     <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg text-white text-sm font-medium z-50 transition-all ${toast.type === 'error' ? 'bg-red-500' :
-                            toast.type === 'success' ? 'bg-green-500' : 'bg-blue-500'
+                        toast.type === 'success' ? 'bg-green-500' : 'bg-blue-500'
                         }`}>
                         {toast.message}
                     </div>
                 )}
 
             </main>
-        </div >
+        </div>
+    );
+}
+
+// --- Main Page Component (The Wrapper) ---
+// This component wraps the content in Suspense, which solves the Vercel build error
+export default function ResultsPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex min-h-screen items-center justify-center bg-background-light dark:bg-background-dark">
+                <div className="text-foreground">Loading VibeMixer...</div>
+            </div>
+        }>
+            <ResultsContent />
+        </Suspense>
     );
 }
