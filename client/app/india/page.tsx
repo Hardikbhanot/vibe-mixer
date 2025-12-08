@@ -21,7 +21,8 @@ export default function IndiaVibePage() {
         setCurrentVideo(null);
 
         try {
-            const response = await fetch(`http://127.0.0.1:4000/youtube/region-vibe?region=${encodeURIComponent(region)}`);
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+            const response = await fetch(`${apiUrl}/youtube/region-vibe?region=${encodeURIComponent(region)}`);
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.details || errorData.error || "Failed to fetch regional vibe");
@@ -45,7 +46,8 @@ export default function IndiaVibePage() {
         if (!videos.length || !selectedRegion) return;
         setCreatingPlaylist(true);
         try {
-            const response = await fetch('http://127.0.0.1:4000/youtube/playlist', {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+            const response = await fetch(`${apiUrl}/youtube/playlist`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -57,7 +59,8 @@ export default function IndiaVibePage() {
             });
 
             if (response.status === 401) {
-                window.location.href = 'http://127.0.0.1:4000/auth/google';
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+                window.location.href = `${apiUrl}/auth/google`;
                 return;
             }
 
