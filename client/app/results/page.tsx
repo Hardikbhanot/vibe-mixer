@@ -57,8 +57,11 @@ function ResultsContent() {
                 const parsed = JSON.parse(storedData);
                 setData(parsed);
 
-                // Trigger image generation if we have a description
-                if (parsed.cover_art_description && !coverImage) {
+                // Trigger image generation if we have a description AND no uploaded image
+                const userImage = localStorage.getItem('userImage');
+                if (userImage) {
+                    setCoverImage(userImage);
+                } else if (parsed.cover_art_description && !coverImage) {
                     generateCoverImage(parsed.cover_art_description);
                 }
             } catch (e) {

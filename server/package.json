@@ -26,6 +26,7 @@
     "googleapis": "^166.0.0",
     "groq-sdk": "^0.37.0",
     "jimp": "^1.6.0",
+    "multer": "^2.0.2",
     "openai": "^6.9.1",
     "spotify-web-api-node": "^5.0.2"
   },

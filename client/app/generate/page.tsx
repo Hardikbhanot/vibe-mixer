@@ -15,11 +15,14 @@ export default function GeneratePage() {
     const [duration, setDuration] = useState(60); // Default 60 minutes
     const [vibeType, setVibeType] = useState<'offbeat' | 'popular' | 'mix'>('mix');
     const [isLoading, setIsLoading] = useState(false);
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
     useEffect(() => {
         if (window.location.hostname === 'localhost') {
             window.location.href = window.location.href.replace('localhost', '127.0.0.1');
         }
+        // Clear any previous user image
+        localStorage.removeItem('userImage');
     }, []);
 
     const handleGenerate = async () => {
@@ -44,11 +47,8 @@ export default function GeneratePage() {
             });
 
             if (response.status === 401) {
-                // Token expired or missing (e.g. cookies cleared)
-                // Redirect to login to re-authenticate
-                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
-                window.location.href = `${apiUrl}/auth/login`;
-                return;
+                // If 401 happens (should be rare now with Guest Mode), show error
+                throw new Error('Authentication failed. Please try logging in again.');
             }
 
             if (!response.ok) {
@@ -63,6 +63,11 @@ export default function GeneratePage() {
             console.log('Saving to localStorage: playlistData', aiData);
             localStorage.setItem('playlistData', JSON.stringify(aiData));
 
+            // If user uploaded an image, save it to use as cover art
+            if (selectedImage) {
+                localStorage.setItem('userImage', selectedImage);
+            }
+
             router.push('/results');
 
         } catch (error) {
@@ -71,6 +76,11 @@ export default function GeneratePage() {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleLogin = () => {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+        window.location.href = `${apiUrl}/auth/login`;
     };
 
     return (
@@ -99,6 +109,92 @@ export default function GeneratePage() {
                 <h2 className="text-foreground tracking-light text-[32px] font-bold leading-tight text-center pb-2 pt-4">
                     Craft Your Perfect Mix
                 </h2>
+
+                {/* Image Upload for Vibe Analysis */}
+                <div className="flex flex-col gap-2">
+                    <p className="text-foreground/80 text-base font-medium leading-normal">
+                        Start with a photo (Optional)
+                    </p>
+                    <div className="relative flex items-center justify-center w-full">
+                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-xl cursor-pointer bg-surface-light dark:bg-surface-dark hover:bg-black/5 dark:hover:bg-white/5 transition-colors overflow-hidden group">
+
+                            {selectedImage ? (
+                                <div className="relative w-full h-full">
+                                    <img src={selectedImage} alt="Preview" className="w-full h-full object-cover opacity-60 group-hover:opacity-40 transition-opacity" />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <span className="bg-black/50 text-white px-3 py-1 rounded-full text-sm font-medium backdrop-blur-sm">Change Image</span>
+                                    </div>
+                                </div>
+                            ) : isLoading ? (
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
+                                    <p className="text-sm text-muted-foreground">Analyzing Vibe...</p>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                                    <span className="material-symbols-outlined text-3xl text-muted-foreground mb-2">add_photo_alternate</span>
+                                    <p className="text-sm text-foreground">
+                                        <span className="font-semibold">Click to upload</span> or drag and drop
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        AI will describe the vibe for you
+                                    </p>
+                                </div>
+                            )}
+
+                            <input
+                                type="file"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+
+                                    if (file.size > 5 * 1024 * 1024) {
+                                        alert('Image is too large. Please upload an image under 5MB.');
+                                        return;
+                                    }
+
+                                    // Create preview
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => {
+                                        setSelectedImage(reader.result as string);
+                                    };
+                                    reader.readAsDataURL(file);
+
+                                    setIsLoading(true);
+                                    try {
+                                        const formData = new FormData();
+                                        formData.append('image', file);
+
+                                        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+                                        const response = await fetch(`${apiUrl}/ai/analyze-image`, {
+                                            method: 'POST',
+                                            body: formData,
+                                        });
+
+                                        if (!response.ok) throw new Error('Failed to analyze image');
+
+                                        const data = await response.json();
+
+                                        // Auto-fill the mood
+                                        setMood(prev => {
+                                            const newMood = data.mood;
+                                            return prev ? `${prev} ${newMood}` : newMood;
+                                        });
+
+                                    } catch (error) {
+                                        console.error('Image upload error:', error);
+                                        alert('Failed to analyze image. Please try again.');
+                                        setSelectedImage(null); // Clear preview on error
+                                    } finally {
+                                        setIsLoading(false);
+                                    }
+                                }}
+                            />
+                        </label>
+                    </div>
+                </div>
 
                 {/* Text Field */}
                 <div className="flex flex-col w-full">
@@ -138,6 +234,17 @@ export default function GeneratePage() {
                             />
                         </label>
                     </div>
+                </div>
+
+                {/* Optional Login Button for Guests */}
+                <div className="flex justify-end -mt-2">
+                    <button
+                        onClick={handleLogin}
+                        className="flex items-center gap-2 text-sm font-medium text-spotify hover:text-spotify/80 transition-colors"
+                    >
+                        <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_Green.png" alt="Spotify" className="h-4 w-auto" />
+                        Login with Spotify (Optional)
+                    </button>
                 </div>
 
                 {/* Advanced Controls Sliders */}

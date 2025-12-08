@@ -1,7 +1,14 @@
 import express from 'express';
-import { generatePlaylistParams } from '../services/groq.js';
+import { generatePlaylistParams, analyzeImage } from '../services/groq.js';
 import { generateImage } from '../services/imagen.js';
 import { initSpotifyApi } from '../middleware/spotifyAuth.js';
+import multer from 'multer';
+
+// Configure Multer for In-Memory Storage (Zero Retention)
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
 
 const router = express.Router();
 
@@ -85,12 +92,32 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
         res.json({
             ...aiParams,
             tracks: finalTracks,
-            total_duration_mins: Math.round(currentDurationMs / 60000)
+            tracks: finalTracks,
+            total_duration_mins: Math.round(currentDurationMs / 60000),
+            isGuest: req.isGuest // Return auth status to frontend
         });
 
     } catch (error) {
         console.error('Error analyzing mood:', error);
         res.status(500).json({ error: 'Failed to analyze mood' });
+    }
+});
+
+router.post('/analyze-image', upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No image uploaded' });
+        }
+
+        const base64Image = req.file.buffer.toString('base64');
+        const mimeType = req.file.mimetype; // e.g., 'image/png'
+        const moodDescription = await analyzeImage(base64Image, mimeType);
+
+        // Memory is automatically cleared when request ends (buffer is garbage collected)
+        res.json({ mood: moodDescription });
+    } catch (error) {
+        console.error('Image analysis error:', error);
+        res.status(500).json({ error: 'Failed to analyze image' });
     }
 });
 
