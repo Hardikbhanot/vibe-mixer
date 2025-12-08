@@ -1,5 +1,6 @@
 import express from 'express';
 import { google } from 'googleapis';
+import { getRegionalVibeQuery } from '../services/groq.js';
 
 const router = express.Router();
 
@@ -123,6 +124,86 @@ router.post('/playlist', initYoutubeClient, async (req, res) => {
     } catch (error) {
         console.error('YouTube API Error:', error);
         res.status(500).json({ error: 'Failed to create YouTube playlist' });
+    }
+});
+
+// Search for Regional Vibe (AI Optimized Search)
+router.get('/region-vibe', async (req, res) => {
+    const { region } = req.query;
+
+    if (!region) {
+        return res.status(400).json({ error: 'Region is required' });
+    }
+
+    try {
+        console.log(`[Region Vibe] Request for region: ${region}`);
+
+        const youtube = google.youtube({
+            version: 'v3',
+            auth: process.env.GOOGLE_API_KEY
+        });
+
+        // 1. Get AI Optimized Query
+        let searchQuery = `Best ${region} songs india`; // Default
+        try {
+            const aiData = await getRegionalVibeQuery(region);
+            if (aiData.searchQuery) {
+                searchQuery = aiData.searchQuery;
+            }
+        } catch (e) {
+            console.error('AI Curation failed, using default query', e);
+        }
+
+        // 2. Search YouTube (Single Request = 100 Quota Units)
+        console.log(`[Region Vibe] Searching YouTube with query: "${searchQuery}"`);
+
+        const searchRes = await youtube.search.list({
+            part: ['snippet'],
+            q: searchQuery,
+            maxResults: 20, // Fetch more to allow filtering
+            type: 'video',
+        });
+
+        if (searchRes.data.items.length > 0) {
+            // Filter out Mashups, Jukeboxes, and Compilations
+            const bannedWords = ['mashup', 'jukebox', 'nonstop', 'collection', 'compilation', 'mix', 'dj'];
+
+            let videos = searchRes.data.items
+                .filter(item => {
+                    const title = item.snippet.title.toLowerCase();
+                    return !bannedWords.some(word => title.includes(word));
+                })
+                .map(item => ({
+                    id: item.id.videoId,
+                    title: item.snippet.title,
+                    thumbnail: item.snippet.thumbnails.medium.url,
+                    channelTitle: item.snippet.channelTitle
+                }));
+
+            // If filtering removed too many, fill back up with original results (to ensure we show something)
+            if (videos.length < 5) {
+                console.log('[Region Vibe] Strict filtering removed too many videos. Relaxing filter.');
+                videos = searchRes.data.items.map(item => ({
+                    id: item.id.videoId,
+                    title: item.snippet.title,
+                    thumbnail: item.snippet.thumbnails.medium.url,
+                    channelTitle: item.snippet.channelTitle
+                }));
+            }
+
+            // Limit to 10
+            return res.json({ videos: videos.slice(0, 10) });
+        }
+
+        res.status(404).json({ error: 'No vibe found' });
+
+    } catch (error) {
+        console.error('YouTube Search Error:', error);
+        // Check for Quota Error specifically
+        if (error.code === 403 && error.message.includes('quota')) {
+            return res.status(403).json({ error: 'YouTube API Quota Exceeded. Please try again tomorrow.' });
+        }
+        res.status(500).json({ error: 'Failed to search YouTube', details: error.message });
     }
 });
 

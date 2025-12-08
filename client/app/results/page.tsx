@@ -75,6 +75,15 @@ export default function ResultsPage() {
         }
     }, [searchParams]);
 
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+    useEffect(() => {
+        if (toast) {
+            const timer = setTimeout(() => setToast(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [toast]);
+
     const generateCoverImage = async (prompt: string) => {
         setIsGeneratingImage(true);
         try {
@@ -86,10 +95,12 @@ export default function ResultsPage() {
             const result = await response.json();
             if (result.imageUrl) {
                 setCoverImage(result.imageUrl);
+            } else {
+                throw new Error('No image URL returned');
             }
         } catch (error) {
             console.error('Failed to generate image:', error);
-            // Fallback to Pollinations if backend fails? Or just show placeholder?
+            setToast({ message: 'AI generation failed. Using fallback cover.', type: 'error' });
         } finally {
             setIsGeneratingImage(false);
         }
@@ -113,14 +124,17 @@ export default function ResultsPage() {
                 credentials: 'include'
             });
 
-            if (!response.ok) throw new Error('Failed to create playlist');
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to create playlist');
+            }
 
             const result = await response.json();
-            alert('Spotify Playlist created successfully!');
+            setToast({ message: 'Spotify Playlist created successfully!', type: 'success' });
             window.open(result.external_urls.spotify, '_blank');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving playlist:', error);
-            alert('Failed to save playlist. Make sure you are logged in to Spotify.');
+            setToast({ message: error.message || 'Failed to save playlist. Check Spotify login.', type: 'error' });
         } finally {
             setIsSaving(false);
         }
@@ -298,6 +312,15 @@ export default function ResultsPage() {
                         Create Another Mix
                     </Link>
                 </div>
+
+                {/* Toast Notification */}
+                {toast && (
+                    <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg text-white text-sm font-medium z-50 transition-all ${toast.type === 'error' ? 'bg-red-500' :
+                            toast.type === 'success' ? 'bg-green-500' : 'bg-blue-500'
+                        }`}>
+                        {toast.message}
+                    </div>
+                )}
 
             </main>
         </div >

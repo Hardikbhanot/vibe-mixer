@@ -73,3 +73,41 @@ Output MUST be a valid JSON object with the following structure:
         throw error;
     }
 };
+
+export const getRegionalVibeQuery = async (region) => {
+    console.log(`[Groq] Generating vibe query for region: ${region}`);
+
+    const prompt = `
+    You are a local music expert for ${region}, India.
+    Create a specific YouTube search query to find popular, iconic, and culturally significant INDIVIDUAL songs from ${region}.
+    The goal is to get a list of separate official music videos, NOT long "Jukebox", "Mashup", "Nonstop", or "Compilation" videos.
+    
+    The query should be specific enough to bring up high-quality official videos.
+    Examples: "Best Punjabi Songs Official Video", "Kerala Folk Songs Full Video", "Rajasthan Traditional Songs Original".
+    
+    Output MUST be a valid JSON object:
+    {
+      "searchQuery": "The optimized search query string"
+    }
+    `;
+
+    try {
+        const completion = await groq.chat.completions.create({
+            messages: [
+                { role: "system", content: "You are a music curator specializing in Indian regional music. Output JSON only." },
+                { role: "user", content: prompt },
+            ],
+            model: "llama-3.3-70b-versatile",
+            response_format: { type: "json_object" },
+            temperature: 0.7,
+        });
+
+        const content = completion.choices[0]?.message?.content;
+        console.log('[Groq] Vibe Query:', content);
+        return JSON.parse(content);
+    } catch (error) {
+        console.error("Groq API Error (Regional):", error);
+        // Fallback
+        return { searchQuery: `Best ${region} songs india` };
+    }
+};
