@@ -16,10 +16,21 @@ export const initSpotifyApi = async (req, res, next) => {
         refreshToken: refreshToken,
     });
 
-    // Case 1: No tokens at all
+    // Case 1: No tokens at all -> Guest Mode (Client Credentials Flow)
     if (!accessToken && !refreshToken) {
-        console.log('[Auth Middleware] No tokens found');
-        return res.status(401).json({ error: 'Not authenticated. Please login.' });
+        console.log('[Auth Middleware] No tokens found - Using Client Credentials Flow (Guest Mode)');
+        try {
+            const data = await spotifyApi.clientCredentialsGrant();
+            const guestAccessToken = data.body['access_token'];
+
+            spotifyApi.setAccessToken(guestAccessToken);
+            req.spotifyApi = spotifyApi;
+            req.isGuest = true; // Flag to indicate guest user
+            return next();
+        } catch (error) {
+            console.error('[Auth Middleware] Client Credentials Grant failed:', error);
+            return res.status(500).json({ error: 'Failed to initialize Spotify API for guest' });
+        }
     }
 
     // Case 2: Access token missing but have refresh token -> Try refresh
@@ -35,14 +46,27 @@ export const initSpotifyApi = async (req, res, next) => {
             // Set new access token in cookie
             res.cookie('spotify_access_token', accessToken, {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
+                secure: true, // Always true for SameSite=None
                 maxAge: expiresIn * 1000,
                 path: '/',
-                sameSite: 'lax'
+                sameSite: 'none'
             });
         } catch (error) {
             console.error('[Auth Middleware] Refresh failed:', error);
-            return res.status(401).json({ error: 'Session expired. Please login again.' });
+            // Fallback to Guest Mode if refresh fails
+            console.log('[Auth Middleware] Refresh failed - Falling back to Guest Mode');
+            try {
+                const data = await spotifyApi.clientCredentialsGrant();
+                const guestAccessToken = data.body['access_token'];
+
+                spotifyApi.setAccessToken(guestAccessToken);
+                req.spotifyApi = spotifyApi;
+                req.isGuest = true;
+                return next();
+            } catch (ccError) {
+                console.error('[Auth Middleware] Fallback Client Credentials failed:', ccError);
+                return res.status(401).json({ error: 'Session expired. Please login again.' });
+            }
         }
     }
 
@@ -50,6 +74,7 @@ export const initSpotifyApi = async (req, res, next) => {
     if (accessToken) {
         spotifyApi.setAccessToken(accessToken);
         req.spotifyApi = spotifyApi;
+        req.isGuest = false;
         next();
     } else {
         // Should not happen if logic is correct, but safety net
