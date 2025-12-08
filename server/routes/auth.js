@@ -50,10 +50,12 @@ router.get('/callback', async (req, res) => {
         });
 
         // Redirect back to frontend
-        res.redirect('http://127.0.0.1:3000/generate');
+        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        res.redirect(`${clientUrl}/generate`);
     } catch (error) {
         console.error('Error during Spotify authentication:', error);
-        res.redirect('http://127.0.0.1:3000/?error=auth_failed');
+        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        res.redirect(`${clientUrl}/?error=auth_failed`);
     }
 });
 
@@ -62,14 +64,15 @@ router.get('/callback', async (req, res) => {
 router.get('/google', (req, res) => {
     console.log('[Google Auth] Initiating...');
     console.log('[Google Auth] Client ID:', process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.substring(0, 10) + '...' : 'MISSING');
-    console.log('[Google Auth] Redirect URI:', 'http://127.0.0.1:4000/auth/google/callback');
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://127.0.0.1:4000/auth/google/callback';
+    console.log('[Google Auth] Redirect URI:', redirectUri);
 
     const scopes = [
         'https://www.googleapis.com/auth/youtube',
         'https://www.googleapis.com/auth/userinfo.profile'
     ];
 
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent('http://127.0.0.1:4000/auth/google/callback')}&response_type=code&scope=${encodeURIComponent(scopes.join(' '))}&access_type=offline&prompt=consent`;
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes.join(' '))}&access_type=offline&prompt=consent`;
 
     console.log('[Google Auth] Generated URL:', url);
 
@@ -80,7 +83,8 @@ router.get('/google/callback', async (req, res) => {
     const code = req.query.code || null;
 
     if (!code) {
-        return res.redirect('http://127.0.0.1:3000/results?error=google_auth_failed');
+        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        return res.redirect(`${clientUrl}/results?error=google_auth_failed`);
     }
 
     try {
@@ -93,7 +97,7 @@ router.get('/google/callback', async (req, res) => {
                 code: code,
                 client_id: process.env.GOOGLE_CLIENT_ID,
                 client_secret: process.env.GOOGLE_CLIENT_SECRET,
-                redirect_uri: 'http://127.0.0.1:4000/auth/google/callback',
+                redirect_uri: process.env.GOOGLE_REDIRECT_URI || 'http://127.0.0.1:4000/auth/google/callback',
                 grant_type: 'authorization_code',
             }),
         });
@@ -102,7 +106,8 @@ router.get('/google/callback', async (req, res) => {
 
         if (data.error) {
             console.error('Google Token Error:', data);
-            return res.redirect('http://127.0.0.1:3000/results?error=google_token_error');
+            const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+            return res.redirect(`${clientUrl}/results?error=google_token_error`);
         }
 
         const { access_token, refresh_token, expires_in } = data;
@@ -126,11 +131,13 @@ router.get('/google/callback', async (req, res) => {
         }
 
         // Redirect back to results page (assuming that's where they clicked "Connect YouTube")
-        res.redirect('http://127.0.0.1:3000/results?google_connected=true');
+        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        res.redirect(`${clientUrl}/results?google_connected=true`);
 
     } catch (error) {
         console.error('Google Auth Error:', error);
-        res.redirect('http://127.0.0.1:3000/results?error=server_error');
+        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        res.redirect(`${clientUrl}/results?error=server_error`);
     }
 });
 
