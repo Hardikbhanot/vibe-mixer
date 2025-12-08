@@ -5,7 +5,7 @@
 VibeMixer is a full-stack AI-powered application that orchestrates music discovery. It solves "playlist paralysis" by transforming natural language prompts into curated playlists, automatically syncing them to **Spotify** and **YouTube** in seconds.
 
 ## 🚀 Live Demo
-
+https://vibemixer.hbhanot.tech/
 
 ## 💡 About The Project
 
