@@ -26,7 +26,8 @@ export default function GeneratePage() {
         setIsLoading(true);
         try {
             // 1. Analyze mood with AI (Groq)
-            const response = await fetch('http://127.0.0.1:4000/ai/analyze', {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+            const response = await fetch(`${apiUrl}/ai/analyze`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -45,7 +46,8 @@ export default function GeneratePage() {
             if (response.status === 401) {
                 // Token expired or missing (e.g. cookies cleared)
                 // Redirect to login to re-authenticate
-                window.location.href = 'http://127.0.0.1:4000/auth/login';
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+                window.location.href = `${apiUrl}/auth/login`;
                 return;
             }
 
