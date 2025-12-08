@@ -25,6 +25,7 @@ interface PlaylistData {
     cover_art_description?: string;
     tracks: Track[];
     total_duration_mins?: number;
+    isGuest?: boolean;
 }
 
 // --- Inner Component (Contains the Logic) ---
@@ -257,14 +258,27 @@ function ResultsContent() {
                         </div>
 
                         <div className="flex flex-wrap gap-3 justify-center md:justify-start">
-                            <button
-                                onClick={handleSaveToSpotify}
-                                disabled={isSaving}
-                                className="flex items-center justify-center gap-2 h-10 px-6 bg-spotify text-white text-sm font-bold rounded-full hover:scale-105 transition-transform disabled:opacity-50"
-                            >
-                                <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_White.png" alt="Spotify" className="h-5 w-auto" />
-                                {isSaving ? 'Saving...' : 'Save to Spotify'}
-                            </button>
+                            {!data.isGuest ? (
+                                <button
+                                    onClick={handleSaveToSpotify}
+                                    disabled={isSaving}
+                                    className="flex items-center justify-center gap-2 h-10 px-6 bg-spotify text-white text-sm font-bold rounded-full hover:scale-105 transition-transform disabled:opacity-50"
+                                >
+                                    <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_White.png" alt="Spotify" className="h-5 w-auto" />
+                                    {isSaving ? 'Saving...' : 'Save to Spotify'}
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => {
+                                        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+                                        window.location.href = `${apiUrl}/auth/login`;
+                                    }}
+                                    className="flex items-center justify-center gap-2 h-10 px-6 bg-transparent border border-spotify text-spotify text-sm font-bold rounded-full hover:bg-spotify hover:text-white transition-colors"
+                                >
+                                    <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_Green.png" alt="Spotify" className="h-5 w-auto" />
+                                    Login to Save
+                                </button>
+                            )}
 
                             <button
                                 onClick={handleSaveToYoutube}
