@@ -16,6 +16,9 @@ export default function Home() {
                         </h1>
                     </div>
                     <div className="flex items-center gap-4">
+                        <Link href="/india" className="text-sm font-medium hover:text-primary transition-colors">
+                            Indian Vibe Map
+                        </Link>
                         <ThemeToggle />
                         <button className="flex items-center justify-center size-10 rounded-full bg-spotify text-white">
                             <span className="material-symbols-outlined">person</span>
@@ -31,7 +34,7 @@ export default function Home() {
                                     className="flex min-h-[480px] flex-col gap-6 bg-cover bg-center bg-no-repeat @[480px]:gap-8 @[480px]:rounded-xl items-start justify-end px-4 pb-10 @[480px]:px-10"
                                     style={{
                                         backgroundImage:
-                                            'linear-gradient(rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.4) 100%), url("https://cdn.usegalileo.ai/sdxl10/e0f5b3e8-5b1e-4b1e-8b1e-8b1e8b1e8b1e.png")',
+                                            'linear-gradient(rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.6) 100%), url("https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=2070&auto=format&fit=crop")',
                                     }}
                                 >
                                     <div className="flex flex-col gap-2 text-left">
