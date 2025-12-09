@@ -10,6 +10,8 @@ import authRoutes from './routes/auth.js';
 import spotifyRoutes from './routes/spotify.js';
 import aiRoutes from './routes/ai.js';
 import youtubeRoutes from './routes/youtube.js';
+import swipeRoutes from './routes/swipe.js';
+import userRoutes from './routes/user.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -35,6 +37,8 @@ app.use('/auth', authRoutes);
 app.use('/spotify', spotifyRoutes);
 app.use('/ai', aiRoutes);
 app.use('/youtube', youtubeRoutes);
+app.use('/api/swipe', swipeRoutes);
+app.use('/api/user', userRoutes);
 
 app.get("/", (req, res) => {
   res.send("Backend is running!");

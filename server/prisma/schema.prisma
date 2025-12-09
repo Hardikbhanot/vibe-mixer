@@ -1,0 +1,32 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  password_hash String
+  created_at    DateTime       @default(now())
+  swipes        SwipeHistory[]
+}
+
+model SwipeHistory {
+  id         String   @id @default(uuid())
+  userId     String
+  songName   String
+  artistName String
+  action     Action
+  created_at DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+enum Action {
+  LIKE
+  DISLIKE
+  SUPERLIKE
+}
