@@ -9,6 +9,9 @@ export const Footer = () => {
                 </div>
 
                 <div className="flex items-center gap-6">
+                    <Link href="/terms" className="hover:text-primary transition-colors">
+                        Terms of Service
+                    </Link>
                     <Link href="/privacy" className="hover:text-primary transition-colors">
                         Privacy Policy
                     </Link>
