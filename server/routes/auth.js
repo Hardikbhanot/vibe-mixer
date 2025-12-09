@@ -276,6 +276,46 @@ router.get('/google/callback', async (req, res) => {
 
         const { access_token, refresh_token, expires_in } = data;
 
+        // Fetch User Profile from Google
+        const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: { Authorization: `Bearer ${access_token}` }
+        });
+        const userProfile = await userRes.json();
+        const googleEmail = userProfile.email;
+        const googleId = userProfile.id;
+
+        console.log(`[Google Auth] Linked to Google User: ${googleEmail} (${googleId})`);
+
+        if (!googleEmail) {
+            throw new Error('Google did not return an email address');
+        }
+
+        // Find or Create User
+        let user = await prisma.user.findUnique({ where: { email: googleEmail } });
+
+        if (!user) {
+            console.log('[Google Auth] Creating new user from Google...');
+            const placeholderPassword = await bcrypt.hash(`google_${googleId}_${Date.now()}`, 10);
+            user = await prisma.user.create({
+                data: {
+                    email: googleEmail,
+                    password_hash: placeholderPassword
+                }
+            });
+        }
+
+        // Generate App Session Token
+        const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
+
+        // Set Auth Token Cookie
+        res.cookie('auth_token', token, {
+            httpOnly: true,
+            secure: true,
+            maxAge: 30 * 24 * 60 * 60 * 1000,
+            path: '/',
+            sameSite: 'none'
+        });
+
         // Set tokens in cookies
         res.cookie('google_access_token', access_token, {
             httpOnly: true,
@@ -294,9 +334,9 @@ router.get('/google/callback', async (req, res) => {
             });
         }
 
-        // Redirect back to results page (assuming that's where they clicked "Connect YouTube")
+        // Redirect back to frontend
         const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
-        res.redirect(`${clientUrl}/results?google_connected=true`);
+        res.redirect(`${clientUrl}/generate`);
 
     } catch (error) {
         console.error('Google Auth Error:', error);
