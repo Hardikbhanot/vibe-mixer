@@ -37,9 +37,13 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: 'Email and password are required' });
         }
 
+        if (password.length < 8) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+        }
+
         const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser) {
-            return res.status(400).json({ error: 'User already exists' });
+            return res.status(400).json({ error: 'User already exists with this email' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
