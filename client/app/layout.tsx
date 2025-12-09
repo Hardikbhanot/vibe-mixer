@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Space_Grotesk } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
+import { DomainRedirect } from "@/components/DomainRedirect";
+// 1. Import the GA Component
+import { GoogleAnalytics } from '@next/third-parties/google';
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -32,9 +35,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <DomainRedirect />
           {children}
         </ThemeProvider>
       </body>
+      {/* 2. Add Google Analytics with your ID */}
+      <GoogleAnalytics gaId="G-4H7R4JH136" />
     </html>
   );
 }

@@ -21,6 +21,7 @@ const scopes = [
 
 // Route to initiate login
 router.get('/login', (req, res) => {
+    console.log('[Spotify Auth] Redirect URI:', process.env.SPOTIFY_REDIRECT_URI);
     const authorizeURL = spotifyApi.createAuthorizeURL(scopes);
     res.redirect(authorizeURL);
 });
@@ -36,20 +37,108 @@ router.get('/callback', async (req, res) => {
         // Set tokens in cookies (httpOnly for security)
         res.cookie('spotify_access_token', access_token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true, // Always true for SameSite=None
             maxAge: expires_in * 1000,
+            path: '/',
+            sameSite: 'none'
         });
 
         res.cookie('spotify_refresh_token', refresh_token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true,
+            path: '/',
+            sameSite: 'none'
         });
 
         // Redirect back to frontend
-        res.redirect('http://127.0.0.1:3000/generate');
+        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        res.redirect(`${clientUrl}/generate`);
     } catch (error) {
         console.error('Error during Spotify authentication:', error);
-        res.redirect('http://127.0.0.1:3000/?error=auth_failed');
+        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        res.redirect(`${clientUrl}/?error=auth_failed`);
+    }
+});
+
+// --- Google / YouTube Auth ---
+
+router.get('/google', (req, res) => {
+    console.log('[Google Auth] Initiating...');
+    console.log('[Google Auth] Client ID:', process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.substring(0, 10) + '...' : 'MISSING');
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://127.0.0.1:4000/auth/google/callback';
+    console.log('[Google Auth] Redirect URI:', redirectUri);
+
+    const scopes = [
+        'https://www.googleapis.com/auth/youtube',
+        'https://www.googleapis.com/auth/userinfo.profile'
+    ];
+
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes.join(' '))}&access_type=offline&prompt=consent`;
+
+    console.log('[Google Auth] Generated URL:', url);
+
+    res.redirect(url);
+});
+
+router.get('/google/callback', async (req, res) => {
+    const code = req.query.code || null;
+
+    if (!code) {
+        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        return res.redirect(`${clientUrl}/results?error=google_auth_failed`);
+    }
+
+    try {
+        const response = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                code: code,
+                client_id: process.env.GOOGLE_CLIENT_ID,
+                client_secret: process.env.GOOGLE_CLIENT_SECRET,
+                redirect_uri: process.env.GOOGLE_REDIRECT_URI || 'http://127.0.0.1:4000/auth/google/callback',
+                grant_type: 'authorization_code',
+            }),
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            console.error('Google Token Error:', data);
+            const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+            return res.redirect(`${clientUrl}/results?error=google_token_error`);
+        }
+
+        const { access_token, refresh_token, expires_in } = data;
+
+        // Set tokens in cookies
+        res.cookie('google_access_token', access_token, {
+            httpOnly: true,
+            secure: true,
+            maxAge: expires_in * 1000,
+            path: '/',
+            sameSite: 'none'
+        });
+
+        if (refresh_token) {
+            res.cookie('google_refresh_token', refresh_token, {
+                httpOnly: true,
+                secure: true,
+                path: '/',
+                sameSite: 'none'
+            });
+        }
+
+        // Redirect back to results page (assuming that's where they clicked "Connect YouTube")
+        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        res.redirect(`${clientUrl}/results?google_connected=true`);
+
+    } catch (error) {
+        console.error('Google Auth Error:', error);
+        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        res.redirect(`${clientUrl}/results?error=server_error`);
     }
 });
 
