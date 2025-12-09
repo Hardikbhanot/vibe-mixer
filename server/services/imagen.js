@@ -2,9 +2,9 @@ export const generateImage = async (prompt) => {
     try {
         console.log('Generating image URL for prompt:', prompt);
         // cleaning prompt for URL
-        const cleanPrompt = encodeURIComponent(prompt.slice(0, 100)); // Limit length for URL safety
-        // Using Pollinations.ai which renders on-demand (fast and reliable fallback)
-        const imageUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=512&height=512&nologo=true&seed=${Math.floor(Math.random() * 1000)}`;
+        const cleanPrompt = encodeURIComponent(prompt.trim().slice(0, 100)); // Limit length for URL safety
+        // Using Pollinations.ai with 'flux' model for better quality
+        const imageUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=512&height=512&nologo=true&model=flux&seed=${Math.floor(Math.random() * 1000)}`;
         return imageUrl;
     } catch (error) {
         console.error("Error generating image URL:", error);

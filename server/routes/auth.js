@@ -41,6 +41,14 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: 'Password must be at least 8 characters long' });
         }
 
+        const hasNumber = /\d/.test(password);
+        const hasUpper = /[A-Z]/.test(password);
+        const hasLower = /[a-z]/.test(password);
+
+        if (!hasNumber || !hasUpper || !hasLower) {
+            return res.status(400).json({ error: 'Password must contain at least one number, one uppercase letter, and one lowercase letter' });
+        }
+
         const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser) {
             return res.status(400).json({ error: 'User already exists with this email' });
@@ -143,10 +151,54 @@ router.get('/callback', async (req, res) => {
     const { code } = req.query;
 
     try {
+        console.log('[Spotify Callback] Code received. Exchanging for token...');
         const data = await spotifyApi.authorizationCodeGrant(code);
         const { access_token, refresh_token, expires_in } = data.body;
 
-        // Set tokens in cookies (httpOnly for security)
+        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        console.log('[Spotify Callback] Success via Spotify API');
+        console.log('[Spotify Callback] Redirecting to Frontend:', clientUrl);
+
+        // Fetch User Profile from Spotify to link/create account
+        spotifyApi.setAccessToken(access_token);
+        const me = await spotifyApi.getMe();
+        const spotifyEmail = me.body.email;
+        const spotifyId = me.body.id;
+
+        console.log(`[Spotify Auth] Linked to Spotify User: ${spotifyEmail} (${spotifyId})`);
+
+        if (!spotifyEmail) {
+            throw new Error('Spotify did not return an email address');
+        }
+
+        // Find or Create User
+        let user = await prisma.user.findUnique({ where: { email: spotifyEmail } });
+
+        if (!user) {
+            // Create new user with placeholder password
+            console.log('[Spotify Auth] Creating new user from Spotify...');
+            const placeholderPassword = await bcrypt.hash(`spotify_${spotifyId}_${Date.now()}`, 10);
+            user = await prisma.user.create({
+                data: {
+                    email: spotifyEmail,
+                    password_hash: placeholderPassword
+                }
+            });
+        }
+
+        // Generate App Session Token
+        const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
+
+        // Set Auth Token Cookie (Critical for app login)
+        res.cookie('auth_token', token, {
+            httpOnly: true,
+            secure: true,
+            maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+            path: '/',
+            sameSite: 'none'
+        });
+
+        // Set Spotify tokens in cookies
         res.cookie('spotify_access_token', access_token, {
             httpOnly: true,
             secure: true, // Always true for SameSite=None
@@ -163,7 +215,6 @@ router.get('/callback', async (req, res) => {
         });
 
         // Redirect back to frontend
-        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
         res.redirect(`${clientUrl}/generate`);
     } catch (error) {
         console.error('Error during Spotify authentication:', error);

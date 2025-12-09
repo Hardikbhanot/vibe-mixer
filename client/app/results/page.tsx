@@ -185,7 +185,8 @@ function ResultsContent() {
         );
     }
 
-    const displayImage = coverImage || `https://image.pollinations.ai/prompt/${encodeURIComponent(data.cover_art_description || data.playlist_name)}?width=512&height=512&nologo=true`;
+    // Use state image if available, otherwise construct a stable fallback (without random seed to avoid hydration mismatch)
+    const displayImage = coverImage || (data ? `https://image.pollinations.ai/prompt/${encodeURIComponent(data.cover_art_description || data.playlist_name)}?width=512&height=512&nologo=true` : '');
 
 
 

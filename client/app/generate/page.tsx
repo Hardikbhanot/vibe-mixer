@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Header } from "@/components/Header";
+import { useAuth } from "@/context/AuthContext";
 
 export default function GeneratePage() {
     const router = useRouter();

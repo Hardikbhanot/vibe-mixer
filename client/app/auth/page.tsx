@@ -15,6 +15,8 @@ export default function AuthPage() {
     // Form State
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const { refreshAuth } = useAuth();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -30,6 +32,23 @@ export default function AuthPage() {
         if (password.length < 8) {
             toast.error('Password must be at least 8 characters long');
             return;
+        }
+
+        if (!isLogin) {
+            if (password !== confirmPassword) {
+                toast.error('Passwords do not match');
+                return;
+            }
+
+            // Strict Validation: Number, Uppercase, Lowercase
+            const hasNumber = /\d/.test(password);
+            const hasUpper = /[A-Z]/.test(password);
+            const hasLower = /[a-z]/.test(password);
+
+            if (!hasNumber || !hasUpper || !hasLower) {
+                toast.error('Password must contain at least one number, one uppercase letter, and one lowercase letter');
+                return;
+            }
         }
 
         setIsLoading(true);
@@ -138,15 +157,52 @@ export default function AuthPage() {
 
                             <div className="space-y-2">
                                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground ml-1">Password</label>
-                                <input
-                                    type="password"
-                                    required
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-primary focus:bg-white dark:focus:bg-black focus:ring-4 focus:ring-primary/10 transition-all outline-none"
-                                    placeholder="••••••••"
-                                />
+                                <div className="relative">
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        required
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="w-full px-4 py-3 pr-12 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-primary focus:bg-white dark:focus:bg-black focus:ring-4 focus:ring-primary/10 transition-all outline-none"
+                                        placeholder="••••••••"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                    >
+                                        <span className="material-symbols-outlined text-lg">
+                                            {showPassword ? 'visibility_off' : 'visibility'}
+                                        </span>
+                                    </button>
+                                </div>
+                                {!isLogin && (
+                                    <p className="text-[10px] text-muted-foreground ml-1">
+                                        Must contain 1 number, 1 uppercase, 1 lowercase.
+                                    </p>
+                                )}
                             </div>
+
+                            <AnimatePresence>
+                                {!isLogin && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="space-y-2 overflow-hidden"
+                                    >
+                                        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground ml-1">Confirm Password</label>
+                                        <input
+                                            type="password"
+                                            required={!isLogin}
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            className="w-full px-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-primary focus:bg-white dark:focus:bg-black focus:ring-4 focus:ring-primary/10 transition-all outline-none"
+                                            placeholder="••••••••"
+                                        />
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
 
                             <motion.button
                                 whileHover={{ scale: 1.02 }}
@@ -193,7 +249,7 @@ export default function AuthPage() {
                                 }}
                                 className="flex items-center justify-center gap-2 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold rounded-xl transition-colors"
                             >
-                                <span className="material-symbols-outlined text-xl">play_circle</span> User
+                                <span className="material-symbols-outlined text-xl">play_circle</span> Google
                             </button>
                         </div>
                     </div>

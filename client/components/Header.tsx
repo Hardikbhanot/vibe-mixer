@@ -26,12 +26,12 @@ export const Header = () => {
             )}
 
             {/* Center: Branding */}
-            <div className="flex items-center gap-2 flex-1 justify-center">
+            <Link href="/" className="flex items-center gap-2 flex-1 justify-center hover:opacity-80 transition-opacity">
                 <img src="/logo.png" alt="Logo" className="w-12 h-12 object-contain" />
                 <h1 className="text-foreground text-3xl font-bold leading-tight tracking-[-0.015em] hidden md:block">
                     VibeMixer
                 </h1>
-            </div>
+            </Link>
 
             {/* Right: Actions */}
             <div className="flex items-center gap-3 justify-end min-w-[120px]">
