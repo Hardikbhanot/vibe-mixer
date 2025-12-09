@@ -228,7 +228,14 @@ router.get('/callback', async (req, res) => {
 router.get('/google', (req, res) => {
     console.log('[Google Auth] Initiating...');
     console.log('[Google Auth] Client ID:', process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.substring(0, 10) + '...' : 'MISSING');
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://127.0.0.1:4000/auth/google/callback';
+    let redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://127.0.0.1:4000/auth/google/callback';
+
+    // Auto-fix common configuration error where /auth/ prefix is missing
+    if (!redirectUri.includes('/auth/google/callback') && redirectUri.includes('/google/callback')) {
+        console.warn(`[Google Auth] Warning: GOOGLE_REDIRECT_URI (${redirectUri}) appears to be missing '/auth' prefix. Auto-correcting...`);
+        redirectUri = redirectUri.replace('/google/callback', '/auth/google/callback');
+    }
+
     console.log('[Google Auth] Redirect URI:', redirectUri);
 
     const scopes = [
