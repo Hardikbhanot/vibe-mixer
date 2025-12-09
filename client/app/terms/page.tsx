@@ -44,29 +44,28 @@ export default function TermsOfService() {
                         <li><a href="https://www.spotify.com/legal/end-user-agreement/" target="_blank" className="text-primary hover:underline">Spotify User Agreement</a></li>
                         <li><a href="https://www.youtube.com/t/terms" target="_blank" className="text-primary hover:underline">YouTube Terms of Service</a></li>
                     </ul>
-                </p>
-            </section>
+                </section>
 
-            <section className="mb-6">
-                <h2 className="text-xl font-semibold mb-2">5. Disclaimer of Warranties</h2>
-                <p className="mb-2">
-                    The service is provided on an "as is" and "as available" basis. VibeMixer makes no warranties, expressed or implied, regarding the accuracy or reliability of the AI-generated content.
-                </p>
-            </section>
+                <section className="mb-6">
+                    <h2 className="text-xl font-semibold mb-2">5. Disclaimer of Warranties</h2>
+                    <p className="mb-2">
+                        The service is provided on an "as is" and "as available" basis. VibeMixer makes no warranties, expressed or implied, regarding the accuracy or reliability of the AI-generated content.
+                    </p>
+                </section>
 
-            <section className="mb-6">
-                <h2 className="text-xl font-semibold mb-2">6. Limitation of Liability</h2>
-                <p className="mb-2">
-                    In no event shall VibeMixer be liable for any indirect, incidental, special, consequential or punitive damages arising out of your use of the service.
-                </p>
-            </section>
+                <section className="mb-6">
+                    <h2 className="text-xl font-semibold mb-2">6. Limitation of Liability</h2>
+                    <p className="mb-2">
+                        In no event shall VibeMixer be liable for any indirect, incidental, special, consequential or punitive damages arising out of your use of the service.
+                    </p>
+                </section>
 
-            <div className="pt-8 mb-10">
-                <Link href="/" className="text-sm font-medium hover:text-primary transition-colors">
-                    &larr; Back to Home
-                </Link>
-            </div>
-        </main>
+                <div className="pt-8 mb-10">
+                    <Link href="/" className="text-sm font-medium hover:text-primary transition-colors">
+                        &larr; Back to Home
+                    </Link>
+                </div>
+            </main>
         </div >
     );
 }
