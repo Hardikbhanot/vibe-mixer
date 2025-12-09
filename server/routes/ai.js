@@ -2,7 +2,11 @@ import express from 'express';
 import { generatePlaylistParams, analyzeImage } from '../services/groq.js';
 import { generateImage } from '../services/imagen.js';
 import { initSpotifyApi } from '../middleware/spotifyAuth.js';
+import { authenticateToken } from '../middleware/auth.js';
 import multer from 'multer';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 // Configure Multer for In-Memory Storage (Zero Retention)
 const upload = multer({
@@ -118,6 +122,95 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
     } catch (error) {
         console.error('Image analysis error:', error);
         res.status(500).json({ error: 'Failed to analyze image' });
+    }
+});
+
+
+
+// Refine Playlist based on Swipe History
+router.post('/refine', authenticateToken, initSpotifyApi, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+
+        // Fetch last 50 likes/superlikes
+        const history = await prisma.swipeHistory.findMany({
+            where: {
+                userId,
+                action: { in: ['LIKE', 'SUPERLIKE'] }
+            },
+            orderBy: { created_at: 'desc' },
+            take: 50
+        });
+
+        if (history.length === 0) {
+            return res.status(400).json({ error: 'No swipe history found. Swipe some songs first!' });
+        }
+
+        // Construct Prompt
+        const likes = history.filter(h => h.action === 'LIKE').map(h => `${h.songName} by ${h.artistName}`);
+        const superlikes = history.filter(h => h.action === 'SUPERLIKE').map(h => `${h.songName} by ${h.artistName}`);
+
+        // Superlikes get mentioned 3 times for emphasis in the LLM context
+        const weightedSuperlikes = [...superlikes, ...superlikes, ...superlikes];
+
+        const promptContext = [
+            ...likes,
+            ...weightedSuperlikes
+        ].join(', ');
+
+        const refineMood = `Based on these user preferences: ${promptContext}. Generate a playlist that blends these styles perfectly.`;
+
+        // Reuse existing generation logic
+        // We set a default duration if not provided
+        const duration = 60;
+
+        // Calculate target number of tracks (avg song ~3.5 mins) + 20% buffer
+        const avgSongLengthMins = 3.5;
+        const targetTrackCount = Math.ceil((duration / avgSongLengthMins) * 1.2);
+
+        // Generate parameters using Groq
+        const aiParams = await generatePlaylistParams(refineMood, 'mix', targetTrackCount, { energy: 50, tempo: 50, valence: 50 });
+
+        // Search Spotify for each suggested track
+        const trackPromises = aiParams.suggested_tracks.map(async (suggestion) => {
+            try {
+                const query = `track:${suggestion.song} artist:${suggestion.artist}`;
+                const searchResult = await req.spotifyApi.searchTracks(query, { limit: 1 });
+                if (searchResult.body.tracks.items.length > 0) {
+                    return searchResult.body.tracks.items[0];
+                }
+                return null;
+            } catch (err) {
+                console.error(`Failed to search for "${suggestion.song}":`, err);
+                return null;
+            }
+        });
+
+        const searchResults = await Promise.all(trackPromises);
+        const foundTracks = searchResults.filter(track => track !== null);
+        const uniqueTracks = Array.from(new Map(foundTracks.map(track => [track.id, track])).values());
+
+        // Simple duration fill logic
+        const targetDurationMs = duration * 60 * 1000;
+        let currentDurationMs = 0;
+        const finalTracks = [];
+
+        for (const track of uniqueTracks) {
+            if (finalTracks.length > 0 && currentDurationMs >= targetDurationMs) break;
+            finalTracks.push(track);
+            currentDurationMs += track.duration_ms;
+        }
+
+        res.json({
+            ...aiParams,
+            tracks: finalTracks,
+            total_duration_mins: Math.round(currentDurationMs / 60000),
+            isGuest: false // Authenticated user
+        });
+
+    } catch (error) {
+        console.error('Refine error:', error);
+        res.status(500).json({ error: 'Failed to refine playlist' });
     }
 });
 

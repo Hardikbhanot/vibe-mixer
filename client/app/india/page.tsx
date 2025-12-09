@@ -97,8 +97,32 @@ export default function IndiaVibePage() {
             <main className="flex-1 flex flex-col md:flex-row p-4 gap-6 max-w-7xl mx-auto w-full h-[calc(100vh-80px)]">
                 {/* Map Section */}
                 <div className="flex-1 flex flex-col bg-card rounded-2xl shadow-sm border border-border overflow-hidden relative">
-                    <div className="absolute top-4 left-4 z-10 bg-background/80 backdrop-blur px-3 py-1 rounded-full text-sm font-medium border border-border">
-                        Select a state to feel the vibe
+                    <div className="absolute top-4 left-4 z-10 w-64">
+                        <div className="relative group">
+                            <span className="absolute left-3 top-2.5 material-symbols-outlined text-muted-foreground group-focus-within:text-primary transition-colors">search</span>
+                            <input
+                                type="text"
+                                placeholder="Search your state..."
+                                className="w-full pl-10 pr-4 py-2 bg-background/80 backdrop-blur-md border border-border rounded-full text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 shadow-sm transition-all"
+                                onChange={(e) => {
+                                    // Simple logic: if enter is pressed or match found?
+                                    // Actually, a datalist or suggestion list is better.
+                                    // For now, let's implement a simple suggestion dropdown.
+                                }}
+                                list="indian-states"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        const val = (e.target as HTMLInputElement).value;
+                                        if (val) handleRegionSelect(val);
+                                    }
+                                }}
+                            />
+                            <datalist id="indian-states">
+                                {['Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal', 'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Puducherry'].map(s => (
+                                    <option key={s} value={s} />
+                                ))}
+                            </datalist>
+                        </div>
                     </div>
                     <IndiaMap onRegionSelect={handleRegionSelect} />
                 </div>

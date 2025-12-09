@@ -1,30 +1,12 @@
 
 import Link from "next/link";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { Header } from "@/components/Header";
 
 export default function Home() {
     return (
         <div className="relative flex size-full min-h-screen flex-col bg-background-light dark:bg-background-dark group/design-root overflow-x-hidden antialiased transition-colors duration-300">
             <div className="layout-container flex h-full grow flex-col">
-                <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-border px-10 py-3">
-                    <div className="flex items-center gap-4 text-foreground">
-                        <div className="size-14">
-                            <img src="/logo.png" alt="VibeMixer Logo" className="size-full object-contain" />
-                        </div>
-                        <h1 className="text-foreground text-3xl font-bold leading-tight tracking-[-0.015em] flex-1">
-                            VibeMixer
-                        </h1>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <Link href="/india" className="text-sm font-medium hover:text-primary transition-colors">
-                            Indian Vibe Map
-                        </Link>
-                        <ThemeToggle />
-                        <button className="flex items-center justify-center size-10 rounded-full bg-spotify text-white">
-                            <span className="material-symbols-outlined">person</span>
-                        </button>
-                    </div>
-                </header>
+                <Header />
 
                 <main className="flex flex-1 justify-center py-5 px-4">
                     <div className="layout-content-container flex flex-col max-w-[960px] flex-1">
@@ -46,7 +28,7 @@ export default function Home() {
                                         </p>
                                     </div>
                                     <Link href="/generate">
-                                        <button className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-4 bg-primary text-background-dark text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/90 transition-colors">
+                                        <button className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-6 bg-gradient-to-r from-primary to-secondary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:shadow-lg hover:shadow-primary/30 hover:scale-105 transition-all">
                                             <span className="truncate">Start Mixing</span>
                                         </button>
                                     </Link>
@@ -107,7 +89,7 @@ export default function Home() {
                         <div className="flex justify-center py-10">
                             <Link href="/generate" className="w-full max-w-sm">
                                 <button
-                                    className="flex w-full max-w-sm cursor-pointer items-center justify-center overflow-hidden rounded-full h-14 px-5 bg-primary text-background-dark text-base font-bold leading-normal tracking-[0.015em] hover:bg-primary/90 transition-colors"
+                                    className="flex w-full max-w-sm cursor-pointer items-center justify-center overflow-hidden rounded-full h-14 px-5 bg-gradient-to-r from-primary to-secondary text-white text-base font-bold leading-normal tracking-[0.015em] hover:shadow-xl hover:shadow-primary/40 hover:scale-[1.02] transition-all"
                                 >
                                     <span className="truncate">Create a Playlist Now</span>
                                 </button>
@@ -115,12 +97,6 @@ export default function Home() {
                         </div>
                     </div>
                 </main>
-
-                <footer className="flex justify-center p-4 border-t border-border">
-                    <p className="text-muted-foreground text-sm font-normal leading-normal">
-                        © 2025 VibeMixer
-                    </p>
-                </footer>
             </div>
         </div>
     );

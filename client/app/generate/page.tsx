@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Header } from "@/components/Header";
 
 export default function GeneratePage() {
     const router = useRouter();
@@ -85,24 +86,7 @@ export default function GeneratePage() {
 
     return (
         <div className="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden antialiased">
-            {/* Top App Bar */}
-            <header className="flex items-center bg-background-light dark:bg-background-dark p-4 pb-2 justify-between sticky top-0 z-10 transition-colors duration-300">
-                <div className="flex size-12 shrink-0 items-center justify-start text-foreground/60">
-                    <Link href="/" className="flex items-center justify-center">
-                        <span className="material-symbols-outlined text-3xl">arrow_back</span>
-                    </Link>
-                </div>
-                <div className="flex items-center gap-2 flex-1 justify-center">
-                    <img src="/logo.png" alt="Logo" className="w-12 h-12 object-contain" />
-                    <h1 className="text-foreground text-3xl font-bold leading-tight tracking-[-0.015em]">
-                        VibeMixer
-                    </h1>
-                </div>
-                <div className="flex size-12 shrink-0 items-center justify-end text-foreground/60 gap-2">
-                    <ThemeToggle />
-                    <span className="material-symbols-outlined text-3xl">more_vert</span>
-                </div>
-            </header>
+            <Header />
 
             <main className="flex flex-col flex-1 px-4 py-6 space-y-8 max-w-xl mx-auto w-full">
                 {/* Headline Text */}
@@ -236,16 +220,7 @@ export default function GeneratePage() {
                     </div>
                 </div>
 
-                {/* Optional Login Button for Guests */}
-                <div className="flex justify-end -mt-2">
-                    <button
-                        onClick={handleLogin}
-                        className="flex items-center gap-2 text-sm font-medium text-spotify hover:text-spotify/80 transition-colors"
-                    >
-                        <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_Green.png" alt="Spotify" className="h-4 w-auto" />
-                        Login with Spotify (Optional)
-                    </button>
-                </div>
+
 
                 {/* Advanced Controls Sliders */}
                 {isAdvanced && (
