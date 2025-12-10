@@ -7,8 +7,6 @@ const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY
 });
 
-
-
 export const generatePlaylistParams = async (userPrompt, vibeType = 'mix', trackCount = 20, features = {}) => {
     console.log('--- Groq Analysis Initiated ---');
     console.log('Vibe Type:', vibeType);
@@ -39,13 +37,21 @@ IMPORTANT INSTRUCTIONS:
 2. **Exact Vibe Match**: Select songs that PERFECTLY match the user's mood and the target audio features below.${featureContext}
 3. **Language Diversity**: ACTIVELY INCLUDE songs from various languages and regions if they fit the vibe (e.g., Spanish, Korean, French, Hindi, etc.). Do not limit to English unless requested.
 4. **Tracklist**: Generate **${trackCount} specific songs** (Song Title + Artist) to ensure enough content for the requested duration.
+5. **Reasoning**: For EACH song, provide a short, punchy 1-sentence reason why it fits this specific mood.
 
 Output MUST be a valid JSON object with the following structure:
 {
   "suggested_tracks": [
-    { "song": "Song Name 1", "artist": "Artist Name 1" },
-    { "song": "Song Name 2", "artist": "Artist Name 2" },
-    ...
+    { 
+      "song": "Song Name 1", 
+      "artist": "Artist Name 1",
+      "reason": "Short reason why this song fits the vibe."
+    },
+    { 
+      "song": "Song Name 2", 
+      "artist": "Artist Name 2",
+      "reason": "Short reason why this song fits the vibe."
+    }
   ], 
   "playlist_name": "Creative Playlist Name",
   "playlist_description": "A short description of the vibe.",
@@ -65,7 +71,7 @@ Output MUST be a valid JSON object with the following structure:
         });
 
         const content = completion.choices[0]?.message?.content;
-        console.log('Groq Response:', content);
+        console.log('Groq Response Length:', content.length);
 
         return JSON.parse(content);
     } catch (error) {
@@ -137,7 +143,7 @@ export const analyzeImage = async (base64Image, mimeType = 'image/jpeg') => {
                     ],
                 },
             ],
-            model: "meta-llama/llama-4-scout-17b-16e-instruct",
+            model: "llama-3.2-90b-vision-preview", // Updated to 90b vision preview for better accuracy
             temperature: 0.5,
             max_tokens: 50,
         });
@@ -151,7 +157,7 @@ export const analyzeImage = async (base64Image, mimeType = 'image/jpeg') => {
             type: error.type,
             code: error.code,
             param: error.param,
-            response: error.error // Groq SDK often puts the API error detail here
+            response: error.error
         });
         console.error("Image Payload Size:", base64Image.length);
         throw error;
