@@ -189,29 +189,31 @@ router.get('/callback', async (req, res) => {
         // Generate App Session Token
         const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
 
+        const isProduction = process.env.NODE_ENV === 'production';
+
         // Set Auth Token Cookie (Critical for app login)
         res.cookie('auth_token', token, {
             httpOnly: true,
-            secure: true,
-            maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+            secure: isProduction ? true : false, // Secure only in prod
+            maxAge: 30 * 24 * 60 * 60 * 1000,
             path: '/',
-            sameSite: 'none'
+            sameSite: isProduction ? 'none' : 'lax' // None requires Secure
         });
 
         // Set Spotify tokens in cookies
         res.cookie('spotify_access_token', access_token, {
             httpOnly: true,
-            secure: true, // Always true for SameSite=None
+            secure: isProduction ? true : false,
             maxAge: expires_in * 1000,
             path: '/',
-            sameSite: 'none'
+            sameSite: isProduction ? 'none' : 'lax'
         });
 
         res.cookie('spotify_refresh_token', refresh_token, {
             httpOnly: true,
-            secure: true,
+            secure: isProduction ? true : false,
             path: '/',
-            sameSite: 'none'
+            sameSite: isProduction ? 'none' : 'lax'
         });
 
         // Redirect back to frontend

@@ -31,7 +31,15 @@ app.use(cors({
   credentials: true
 }));
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+
+// Debug Middleware for Cookies
+app.use((req, res, next) => {
+  console.log(`[Request] ${req.method} ${req.url}`);
+  console.log(' - Origin:', req.headers.origin);
+  console.log(' - Cookies:', req.cookies);
+  next();
+});
 
 // Routes
 app.use('/auth', authRoutes);

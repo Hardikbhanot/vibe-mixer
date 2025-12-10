@@ -81,7 +81,7 @@ function ResultsContent() {
     const generateCoverImage = async (prompt: string) => {
         setIsGeneratingImage(true);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+            const apiUrl = '';
             const response = await fetch(`${apiUrl}/ai/image`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -109,7 +109,6 @@ function ResultsContent() {
             const element = document.getElementById('instagram-story-card');
             if (!element) throw new Error('Card not found');
 
-
             const imgElement = element.querySelector('img');
             const originalSrc = imgElement?.src;
 
@@ -125,13 +124,11 @@ function ResultsContent() {
 
                     imgElement.src = base64Url;
                 } catch (e) {
-                    console.warn("Base64 conversion failed, trying standard capture...", e);
+                    // console.warn("Base64 conversion failed...", e);
                 }
             }
 
-
             await new Promise(resolve => setTimeout(resolve, 500));
-
 
             const canvas = await html2canvas(element, {
                 useCORS: true,
@@ -141,9 +138,7 @@ function ResultsContent() {
                 logging: false,
             });
 
-
             if (imgElement && originalSrc) imgElement.src = originalSrc;
-
 
             const image = canvas.toDataURL("image/png");
             const link = document.createElement('a');
@@ -155,7 +150,7 @@ function ResultsContent() {
 
         } catch (error) {
             console.error("Share failed:", error);
-            toast.error("Failed to generate image. Check console for details.");
+            toast.error("Failed to generate image.");
         } finally {
             setIsSharing(false);
         }
@@ -164,35 +159,42 @@ function ResultsContent() {
     const handleSaveToLibrary = async () => {
         if (!data) return;
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
-            const token = localStorage.getItem('token');
+            const apiUrl = '';
 
-            if (!token) {
-                toast.error("Please login to save to library");
-                router.push('/auth');
-                return;
-            }
-
+            // Check auth via cookie/session
+            // Note: /api/playlists is correctly handled by rewrite to /api/playlists (which goes to backend)
             const response = await fetch(`${apiUrl}/api/playlists`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
+                credentials: 'include', // Sends the auth_token cookie
                 body: JSON.stringify({
                     name: data.playlist_name,
                     description: data.playlist_description,
-                    coverImage: coverImage, // The current image URL
-                    mood: "Mix", // You can pass the actual mood prompt here if you stored it
-                    tracks: data.tracks
+                    coverImage: coverImage,
+                    mood: "Mix",
+                    tracks: data.tracks.map((t: any) => ({
+                        id: t.id,
+                        name: t.name,
+                        uri: t.uri,
+                        artist: t.artists[0]?.name || 'Unknown',
+                        album: t.album?.name,
+                        image: t.album?.images[0]?.url,
+                        duration_ms: t.duration_ms
+                    }))
                 })
             });
 
             if (response.ok) {
                 toast.success("Saved to your profile!");
+            } else if (response.status === 401) {
+                toast.error("Please login to save to library");
+                router.push('/auth');
             } else {
                 toast.error("Failed to save.");
             }
         } catch (e) {
             console.error(e);
+            toast.error("Network error when saving.");
         }
     };
     const handleSaveToSpotify = async () => {
@@ -200,7 +202,7 @@ function ResultsContent() {
         setIsSaving(true);
         try {
             const finalCoverImage = coverImage || `https://image.pollinations.ai/prompt/${encodeURIComponent(data.cover_art_description || data.playlist_name)}?width=512&height=512&nologo=true`;
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+            const apiUrl = '';
 
             const response = await fetch(`${apiUrl}/spotify/playlist`, {
                 method: 'POST',
@@ -233,7 +235,7 @@ function ResultsContent() {
         if (!data) return;
         setIsSavingYoutube(true);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+            const apiUrl = '';
             const response = await fetch(`${apiUrl}/youtube/playlist`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -361,7 +363,7 @@ function ResultsContent() {
                                     {isSaving ? 'Saving...' : 'Save to Spotify'}
                                 </button>
                             ) : (
-                                <button onClick={() => { const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000'; window.location.href = `${apiUrl}/auth/login`; }} className="flex items-center justify-center gap-2 h-10 px-6 bg-transparent border border-[#1DB954] text-[#1DB954] text-sm font-bold rounded-full hover:bg-[#1DB954] hover:text-white transition-colors">
+                                <button onClick={() => { window.location.href = `/auth/login`; }} className="flex items-center justify-center gap-2 h-10 px-6 bg-transparent border border-[#1DB954] text-[#1DB954] text-sm font-bold rounded-full hover:bg-[#1DB954] hover:text-white transition-colors">
                                     <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_Green.png" alt="Spotify" className="h-5 w-auto" />
                                     Login to Save
                                 </button>
@@ -377,12 +379,7 @@ function ResultsContent() {
                                 <span className="material-symbols-outlined text-xl">bookmark</span>
                                 Save to Library
                             </button>
-                            <button
-                                onClick={() => alert(localStorage.getItem('token') || 'No Token Found')}
-                                className="fixed bottom-4 right-4 bg-red-500 text-white p-4 rounded-full z-[9999]"
-                            >
-                                Check Token
-                            </button>
+                            {/* Debug button removed */}
                             <button
                                 onClick={handleShareToInstagram}
                                 disabled={isSharing}
@@ -406,7 +403,7 @@ function ResultsContent() {
                             <span className="text-muted-foreground w-6 text-center text-sm font-medium mt-3">{index + 1}</span>
 
                             <div className="relative w-12 h-12 rounded-md shadow-sm overflow-hidden group-hover:scale-105 transition-transform shrink-0 mt-1">
-                                <img src={track.album.images[2]?.url || track.album.images[0]?.url} alt={track.name} className="w-full h-full object-cover" />
+                                <img src={track.image || track.album?.images?.[2]?.url || track.album?.images?.[0]?.url || '/placeholder.png'} alt={track.name} className="w-full h-full object-cover" />
                                 <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                     <span className="material-symbols-outlined text-white text-xl">play_arrow</span>
                                 </div>
@@ -414,7 +411,7 @@ function ResultsContent() {
 
                             <div className="flex-1 min-w-0">
                                 <p className="text-foreground text-base font-medium truncate group-hover:text-primary transition-colors">{track.name}</p>
-                                <p className="text-muted-foreground text-sm truncate">{track.artists.map(a => a.name).join(', ')}</p>
+                                <p className="text-muted-foreground text-sm truncate">{track.artist || track.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist'}</p>
 
                                 {track.ai_reason && (
                                     <div className="mt-2 flex items-start gap-1.5 p-2 rounded-lg bg-primary/5 border border-primary/10 opacity-90 group-hover:opacity-100 transition-opacity">
@@ -473,46 +470,88 @@ function ResultsContent() {
                     </div>
                 )}
 
-                {/* ✅ 4. HIDDEN INSTAGRAM CARD (Added at very bottom) */}
+                {/* ✅ 4. HIDDEN INSTAGRAM CARD (Fixed for html2canvas) */}
+                {/* We place it far off-screen so it doesn't interfere with UI. html2canvas can still find it by ID. */}
                 {data && (
                     <div
                         id="instagram-story-card"
-                        className="fixed top-0 left-0 -z-50 w-[1080px] h-[1920px] bg-black text-white p-16 flex flex-col items-center justify-between font-sans"
-                        style={{ transform: 'translateX(-9999px)' }}
+                        className="fixed flex flex-col items-center justify-between font-sans"
+                        style={{
+                            left: '-9999px',
+                            top: '0',
+                            width: '1080px',
+                            height: '1920px',
+                            zIndex: -1,
+                            background: '#000000',
+                            color: '#ffffff',
+                            fontFamily: 'Arial, sans-serif'
+                        }}
                     >
-                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-black opacity-80"></div>
-                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30"></div>
+                        {/* Use simple hex/rgba for background - Standard CSS Gradients */}
+                        <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom right, #312e81, #581c87, #000000)', opacity: 1 }}></div>
+
+                        {/* Patterns - REMOVED due to CORS error */}
+                        {/* <div className="absolute inset-0 opacity-30" style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/stardust.png')" }}></div> */}
 
                         <div className="relative z-10 flex flex-col items-center gap-6 mt-20">
-                            <div className="px-8 py-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20">
-                                <span className="text-3xl font-bold tracking-widest uppercase">My Vibe Today</span>
+                            <div className="px-8 py-3 rounded-full border"
+                                style={{
+                                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                                    borderColor: 'rgba(255, 255, 255, 0.2)'
+                                }}>
+                                <span className="text-3xl font-bold tracking-widest uppercase" style={{ color: '#ffffff' }}>My Vibe Today</span>
                             </div>
                         </div>
 
                         <div className="relative z-10 flex flex-col items-center gap-10 w-full px-12">
-                            <div className="w-[800px] h-[800px] rounded-3xl overflow-hidden shadow-2xl border-4 border-white/10 relative">
+                            <div className="w-[800px] h-[800px] rounded-3xl overflow-hidden border-4 relative"
+                                style={{
+                                    backgroundColor: '#111827',
+                                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+                                }}>
                                 <img
                                     src={displayImage}
                                     alt="Cover"
                                     crossOrigin="anonymous"
                                     className="w-full h-full object-cover"
                                 />
-                                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 to-transparent p-10 pt-32">
-                                    <h1 className="text-7xl font-bold text-white leading-tight mb-4">{data.playlist_name}</h1>
-                                    <p className="text-3xl text-gray-300 font-medium italic">"{data.playlist_description}"</p>
+                                <div className="absolute bottom-0 inset-x-0 p-10 pt-32" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)' }}>
+                                    <h1 className="text-7xl font-bold leading-tight mb-4" style={{ color: '#ffffff' }}>{data.playlist_name}</h1>
+                                    <p className="text-3xl font-medium italic" style={{ color: '#d1d5db' }}>"{data.playlist_description}"</p>
                                 </div>
                             </div>
 
                             <div className="w-full flex flex-col gap-6 mt-8">
-                                <p className="text-2xl text-gray-400 font-bold uppercase tracking-wider ml-2">Featuring</p>
+                                <p className="text-2xl font-bold uppercase tracking-wider ml-2" style={{ color: '#9ca3af' }}>Featuring</p>
                                 {data.tracks.slice(0, 3).map((track, i) => (
-                                    <div key={i} className="flex items-center gap-6 p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/5">
-                                        <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-primary to-purple-500 flex items-center justify-center font-bold text-2xl">
+                                    <div key={i} className="flex items-center gap-6 p-6 rounded-2xl border"
+                                        style={{
+                                            backgroundColor: 'rgba(20, 20, 20, 0.8)', // Darker, no blur for clean capture
+                                            borderColor: 'rgba(255, 255, 255, 0.1)'
+                                        }}>
+                                        <div className="w-16 h-16 rounded-full flex items-center justify-center font-bold text-2xl"
+                                            style={{
+                                                background: 'linear-gradient(to top right, #9333ea, #a855f7)',
+                                                color: '#ffffff'
+                                            }}>
                                             {i + 1}
                                         </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-4xl font-bold truncate max-w-[600px]">{track.name}</span>
-                                            <span className="text-2xl text-gray-400">{track.artists[0].name}</span>
+                                        <div className="flex flex-col" style={{ overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                            <span className="text-4xl font-bold truncate" style={{
+                                                color: '#ffffff',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                lineHeight: '1.5',
+                                                display: 'block',
+                                                paddingBottom: '5px' // Prevent clipping
+                                            }}>{track.name}</span>
+                                            <span className="text-2xl" style={{
+                                                color: '#9ca3af',
+                                                lineHeight: '1.4',
+                                                display: 'block'
+                                            }}>{track.artist || track.artists?.[0]?.name || 'Unknown'}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -520,13 +559,13 @@ function ResultsContent() {
                         </div>
 
                         <div className="relative z-10 mb-20 flex flex-col items-center gap-4">
-                            <p className="text-3xl font-medium text-gray-400">Generated by</p>
+                            <p className="text-3xl font-medium" style={{ color: '#9ca3af' }}>Generated by</p>
                             <div className="flex items-center gap-4">
-                                <span className="text-6xl font-black bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-400">
+                                <span className="text-6xl font-black" style={{ color: '#c084fc' }}>
                                     VibeMixer
                                 </span>
                             </div>
-                            <p className="text-2xl text-gray-500 mt-2">vibemixer.tech</p>
+                            <p className="text-2xl mt-2" style={{ color: '#6b7280' }}>vibemixer.tech</p>
                         </div>
                     </div>
                 )}

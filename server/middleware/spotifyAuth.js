@@ -16,8 +16,43 @@ export const initSpotifyApi = async (req, res, next) => {
         refreshToken: refreshToken,
     });
 
-    // Case 1: No tokens at all -> Guest Mode (Client Credentials Flow)
+    // Helper: Refresh Token Function attached to Request for routes to use
+    req.refreshSpotifyToken = async () => {
+        if (!refreshToken) throw new Error('No refresh token available');
+        try {
+            console.log('[Auth Middleware] Force refreshing token...');
+
+            // Ensure refresh token is set on the API object
+            spotifyApi.setRefreshToken(refreshToken);
+
+            const data = await spotifyApi.refreshAccessToken();
+            const newAccessToken = data.body['access_token'];
+            const expiresIn = data.body['expires_in'];
+
+            // Update API instance
+            spotifyApi.setAccessToken(newAccessToken);
+
+            // Update Cookie
+            const isProduction = process.env.NODE_ENV === 'production';
+            res.cookie('spotify_access_token', newAccessToken, {
+                httpOnly: true,
+                secure: isProduction ? true : false,
+                maxAge: expiresIn * 1000,
+                path: '/',
+                sameSite: isProduction ? 'none' : 'lax'
+            });
+
+            console.log('[Auth Middleware] Token refreshed successfully');
+            return newAccessToken;
+        } catch (error) {
+            console.error('[Auth Middleware] Refresh failed:', error);
+            throw error;
+        }
+    };
+
+    // Case 1: No tokens at all -> Guest Mode
     if (!accessToken && !refreshToken) {
+        // ... (Guest Logic - Keep existing)
         console.log('[Auth Middleware] No tokens found - Using Client Credentials Flow (Guest Mode)');
         try {
             const data = await spotifyApi.clientCredentialsGrant();
@@ -25,7 +60,7 @@ export const initSpotifyApi = async (req, res, next) => {
 
             spotifyApi.setAccessToken(guestAccessToken);
             req.spotifyApi = spotifyApi;
-            req.isGuest = true; // Flag to indicate guest user
+            req.isGuest = true;
             return next();
         } catch (error) {
             console.error('[Auth Middleware] Client Credentials Grant failed:', error);
@@ -36,24 +71,12 @@ export const initSpotifyApi = async (req, res, next) => {
     // Case 2: Access token missing but have refresh token -> Try refresh
     if (!accessToken && refreshToken) {
         try {
-            console.log('[Auth Middleware] Access token expired, attempting refresh...');
-            const data = await spotifyApi.refreshAccessToken();
-            accessToken = data.body['access_token'];
-            const expiresIn = data.body['expires_in'];
-
-            console.log('[Auth Middleware] Token refreshed successfully');
-
-            // Set new access token in cookie
-            res.cookie('spotify_access_token', accessToken, {
-                httpOnly: true,
-                secure: true, // Always true for SameSite=None
-                maxAge: expiresIn * 1000,
-                path: '/',
-                sameSite: 'none'
-            });
+            await req.refreshSpotifyToken();
+            req.spotifyApi = spotifyApi;
+            req.isGuest = false;
+            return next();
         } catch (error) {
-            console.error('[Auth Middleware] Refresh failed:', error);
-            // Fallback to Guest Mode if refresh fails
+            // Fallback to Guest
             console.log('[Auth Middleware] Refresh failed - Falling back to Guest Mode');
             try {
                 const data = await spotifyApi.clientCredentialsGrant();
@@ -64,20 +87,18 @@ export const initSpotifyApi = async (req, res, next) => {
                 req.isGuest = true;
                 return next();
             } catch (ccError) {
-                console.error('[Auth Middleware] Fallback Client Credentials failed:', ccError);
                 return res.status(401).json({ error: 'Session expired. Please login again.' });
             }
         }
     }
 
-    // Case 3: Have access token (either existing or refreshed)
+    // Case 3: Have access token (assume valid, but route can refresh if 401)
     if (accessToken) {
         spotifyApi.setAccessToken(accessToken);
         req.spotifyApi = spotifyApi;
         req.isGuest = false;
         next();
     } else {
-        // Should not happen if logic is correct, but safety net
         res.status(401).json({ error: 'Authentication failed' });
     }
 };

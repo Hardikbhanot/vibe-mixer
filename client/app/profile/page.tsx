@@ -28,7 +28,7 @@ interface SavedPlaylist {
 export default function ProfilePage() {
     const { user, logout, loading: authLoading } = useAuth();
     const router = useRouter();
-    
+
     // --- State ---
     const [history, setHistory] = useState<SwipeRecord[]>([]);
     const [playlists, setPlaylists] = useState<SavedPlaylist[]>([]);
@@ -51,7 +51,7 @@ export default function ProfilePage() {
 
     const fetchSwipes = async () => {
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+            const apiUrl = '';
             const res = await fetch(`${apiUrl}/api/user/history`, { credentials: 'include' });
             if (res.ok) {
                 const data = await res.json();
@@ -64,12 +64,10 @@ export default function ProfilePage() {
 
     const fetchPlaylists = async () => {
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
-            const token = localStorage.getItem('token'); // Need JWT for this new route
-            if (!token) return;
+            const apiUrl = '';
 
             const res = await fetch(`${apiUrl}/api/playlists`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+                credentials: 'include'
             });
             if (res.ok) {
                 const data = await res.json();
@@ -83,7 +81,7 @@ export default function ProfilePage() {
     // --- Actions ---
     const deleteSwipe = async (id: string) => {
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+            const apiUrl = '';
             const res = await fetch(`${apiUrl}/api/user/history/${id}`, {
                 method: 'DELETE',
                 credentials: 'include'
@@ -99,14 +97,13 @@ export default function ProfilePage() {
 
     const deletePlaylist = async (e: React.MouseEvent, id: number) => {
         e.stopPropagation();
-        if(!confirm("Delete this mix forever?")) return;
+        if (!confirm("Delete this mix forever?")) return;
 
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
-            const token = localStorage.getItem('token');
+            const apiUrl = '';
             await fetch(`${apiUrl}/api/playlists/${id}`, {
                 method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+                credentials: 'include'
             });
             setPlaylists(prev => prev.filter(p => p.id !== id));
             toast.success("Mix deleted");
@@ -129,7 +126,7 @@ export default function ProfilePage() {
 
         localStorage.setItem('playlistData', JSON.stringify(playlistData));
         if (playlist.coverImage) localStorage.setItem('userImage', playlist.coverImage);
-        
+
         router.push('/results');
     };
 
@@ -152,7 +149,7 @@ export default function ProfilePage() {
                         <h2 className="text-2xl font-bold">{user?.email}</h2>
                         <p className="text-muted-foreground text-sm">Vibe Curator</p>
                     </div>
-                    
+
                     {/* Stats Row */}
                     <div className="flex gap-6 mt-2">
                         <div className="text-center">
@@ -178,21 +175,19 @@ export default function ProfilePage() {
                 <div className="flex p-1 bg-surface-light dark:bg-surface-dark rounded-xl mx-auto max-w-sm">
                     <button
                         onClick={() => setActiveTab('playlists')}
-                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                            activeTab === 'playlists' 
-                            ? 'bg-background-light dark:bg-background-dark shadow-sm text-primary' 
-                            : 'text-muted-foreground hover:text-foreground'
-                        }`}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'playlists'
+                                ? 'bg-background-light dark:bg-background-dark shadow-sm text-primary'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
                     >
                         My Mixes
                     </button>
                     <button
                         onClick={() => setActiveTab('history')}
-                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                            activeTab === 'history' 
-                            ? 'bg-background-light dark:bg-background-dark shadow-sm text-primary' 
-                            : 'text-muted-foreground hover:text-foreground'
-                        }`}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'history'
+                                ? 'bg-background-light dark:bg-background-dark shadow-sm text-primary'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
                     >
                         Swipe History
                     </button>
@@ -213,14 +208,14 @@ export default function ProfilePage() {
                         ) : (
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                 {playlists.map((playlist) => (
-                                    <div 
-                                        key={playlist.id} 
+                                    <div
+                                        key={playlist.id}
                                         onClick={() => loadPlaylist(playlist)}
                                         className="group relative bg-surface-light dark:bg-surface-dark rounded-2xl overflow-hidden cursor-pointer hover:shadow-xl transition-all border border-transparent hover:border-primary/20"
                                     >
                                         <div className="aspect-square relative overflow-hidden bg-black/5">
-                                            <img 
-                                                src={playlist.coverImage || '/placeholder.png'} 
+                                            <img
+                                                src={playlist.coverImage || '/placeholder.png'}
                                                 alt={playlist.name}
                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                             />
@@ -240,7 +235,7 @@ export default function ProfilePage() {
                                             </p>
                                         </div>
 
-                                        <button 
+                                        <button
                                             onClick={(e) => deletePlaylist(e, playlist.id)}
                                             className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center bg-black/50 hover:bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all z-10"
                                         >
@@ -285,11 +280,10 @@ export default function ProfilePage() {
                                             <span className="text-xs text-muted-foreground truncate">{item.artistName}</span>
                                         </div>
                                         <div className="flex items-center gap-3 shrink-0">
-                                            <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${
-                                                item.action === 'LIKE' ? 'bg-green-500/10 text-green-500' :
-                                                item.action === 'SUPERLIKE' ? 'bg-blue-500/10 text-blue-500' :
-                                                'bg-red-500/10 text-red-500'
-                                            }`}>
+                                            <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${item.action === 'LIKE' ? 'bg-green-500/10 text-green-500' :
+                                                    item.action === 'SUPERLIKE' ? 'bg-blue-500/10 text-blue-500' :
+                                                        'bg-red-500/10 text-red-500'
+                                                }`}>
                                                 {item.action}
                                             </span>
                                             <button

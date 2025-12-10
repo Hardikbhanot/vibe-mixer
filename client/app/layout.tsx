@@ -5,6 +5,7 @@ import "./globals.css";
 import { DomainRedirect } from "@/components/DomainRedirect";
 // 1. Import the GA Component
 import { GoogleAnalytics } from '@next/third-parties/google';
+import { Toaster } from "sonner";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -62,6 +63,7 @@ export default function RootLayout({
             <DomainRedirect />
             {children}
             <Footer />
+            <Toaster position="top-center" richColors />
           </AuthProvider>
         </ThemeProvider>
       </body>
