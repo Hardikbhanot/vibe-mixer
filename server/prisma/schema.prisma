@@ -12,7 +12,10 @@ model User {
   email         String         @unique
   password_hash String
   created_at    DateTime       @default(now())
+  
+  
   swipes        SwipeHistory[]
+  playlists     Playlist[]    
 }
 
 model SwipeHistory {
@@ -22,7 +25,24 @@ model SwipeHistory {
   artistName String
   action     Action
   created_at DateTime @default(now())
+  
   user       User     @relation(fields: [userId], references: [id])
+}
+
+
+model Playlist {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  coverImage  String?
+  mood        String?  
+  
+  tracks      Json     
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
 }
 
 enum Action {

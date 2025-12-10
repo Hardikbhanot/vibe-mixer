@@ -12,6 +12,7 @@ import aiRoutes from './routes/ai.js';
 import youtubeRoutes from './routes/youtube.js';
 import swipeRoutes from './routes/swipe.js';
 import userRoutes from './routes/user.js';
+import playlistRoutes from './routes/playlists.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -39,6 +40,7 @@ app.use('/ai', aiRoutes);
 app.use('/youtube', youtubeRoutes);
 app.use('/api/swipe', swipeRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/playlists', playlistRoutes);
 
 app.get("/", (req, res) => {
   res.send("Backend is running!");

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Header } from "@/components/Header";
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import html2canvas from "html2canvas"; // ✅ 1. IMPORT ADDED
+import html2canvas from "html2canvas";
 
 // --- Types ---
 interface Track {
@@ -19,7 +19,7 @@ interface Track {
     uri: string;
     duration_ms: number;
     external_urls: { spotify: string };
-    ai_reason?: string; 
+    ai_reason?: string;
 }
 
 interface PlaylistData {
@@ -41,7 +41,7 @@ function ResultsContent() {
     const [error, setError] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isSavingYoutube, setIsSavingYoutube] = useState(false);
-    const [isSharing, setIsSharing] = useState(false); // ✅ ADDED STATE
+    const [isSharing, setIsSharing] = useState(false);
     const [coverImage, setCoverImage] = useState<string | null>(null);
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     const [showPlatformModal, setShowPlatformModal] = useState(false);
@@ -110,9 +110,9 @@ function ResultsContent() {
             if (!element) throw new Error('Card not found');
 
             const canvas = await html2canvas(element, {
-                useCORS: true, 
-                scale: 2, 
-                backgroundColor: '#000000', 
+                useCORS: true,
+                scale: 2,
+                backgroundColor: '#000000',
             });
 
             const image = canvas.toDataURL("image/png");
@@ -130,6 +130,42 @@ function ResultsContent() {
         }
     };
 
+    const handleSaveToLibrary = async () => {
+        if (!data) return;
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+            const token = localStorage.getItem('token');
+
+            if (!token) {
+                toast.error("Please login to save to library");
+                router.push('/auth/login');
+                return;
+            }
+
+            const response = await fetch(`${apiUrl}/api/playlists`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    name: data.playlist_name,
+                    description: data.playlist_description,
+                    coverImage: coverImage, // The current image URL
+                    mood: "Mix", // You can pass the actual mood prompt here if you stored it
+                    tracks: data.tracks
+                })
+            });
+
+            if (response.ok) {
+                toast.success("Saved to your profile!");
+            } else {
+                toast.error("Failed to save.");
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    };
     const handleSaveToSpotify = async () => {
         if (!data) return;
         setIsSaving(true);
@@ -196,6 +232,9 @@ function ResultsContent() {
             setIsSavingYoutube(false);
         }
     };
+
+
+
 
     if (loading) return <div className="flex h-screen items-center justify-center">Loading your vibe...</div>;
 
@@ -302,10 +341,16 @@ function ResultsContent() {
                                 <span className="material-symbols-outlined text-xl">play_circle</span>
                                 {isSavingYoutube ? 'Creating...' : 'Save to YouTube'}
                             </button>
-                            
-                            {/* ✅ 3. NEW SHARE BUTTON ADDED HERE */}
-                            <button 
-                                onClick={handleShareToInstagram} 
+                            <button
+                                onClick={handleSaveToLibrary}
+                                className="flex items-center justify-center gap-2 h-10 px-6 bg-surface-light dark:bg-surface-dark border border-foreground/10 hover:bg-foreground/5 text-sm font-bold rounded-full transition-colors"
+                            >
+                                <span className="material-symbols-outlined text-xl">bookmark</span>
+                                Save to Library
+                            </button>
+
+                            <button
+                                onClick={handleShareToInstagram}
                                 disabled={isSharing}
                                 className="flex items-center justify-center gap-2 h-10 px-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-bold rounded-full hover:scale-105 transition-transform disabled:opacity-50"
                             >
@@ -325,18 +370,18 @@ function ResultsContent() {
                             className="flex items-start gap-4 p-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors group cursor-pointer"
                         >
                             <span className="text-muted-foreground w-6 text-center text-sm font-medium mt-3">{index + 1}</span>
-                            
+
                             <div className="relative w-12 h-12 rounded-md shadow-sm overflow-hidden group-hover:scale-105 transition-transform shrink-0 mt-1">
                                 <img src={track.album.images[2]?.url || track.album.images[0]?.url} alt={track.name} className="w-full h-full object-cover" />
                                 <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                     <span className="material-symbols-outlined text-white text-xl">play_arrow</span>
                                 </div>
                             </div>
-                            
+
                             <div className="flex-1 min-w-0">
                                 <p className="text-foreground text-base font-medium truncate group-hover:text-primary transition-colors">{track.name}</p>
                                 <p className="text-muted-foreground text-sm truncate">{track.artists.map(a => a.name).join(', ')}</p>
-                                
+
                                 {track.ai_reason && (
                                     <div className="mt-2 flex items-start gap-1.5 p-2 rounded-lg bg-primary/5 border border-primary/10 opacity-90 group-hover:opacity-100 transition-opacity">
                                         <span className="material-symbols-outlined text-[14px] text-primary mt-0.5 shrink-0 select-none">
@@ -348,7 +393,7 @@ function ResultsContent() {
                                     </div>
                                 )}
                             </div>
-                            
+
                             <div className="text-muted-foreground text-sm font-variant-numeric tabular-nums whitespace-nowrap mt-3">
                                 {Math.floor(track.duration_ms / 60000)}:{((track.duration_ms % 60000) / 1000).toFixed(0).padStart(2, '0')}
                             </div>
@@ -396,10 +441,10 @@ function ResultsContent() {
 
                 {/* ✅ 4. HIDDEN INSTAGRAM CARD (Added at very bottom) */}
                 {data && (
-                    <div 
-                        id="instagram-story-card" 
+                    <div
+                        id="instagram-story-card"
                         className="fixed top-0 left-0 -z-50 w-[1080px] h-[1920px] bg-black text-white p-16 flex flex-col items-center justify-between font-sans"
-                        style={{ transform: 'translateX(-9999px)' }} 
+                        style={{ transform: 'translateX(-9999px)' }}
                     >
                         <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-black opacity-80"></div>
                         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30"></div>
@@ -412,11 +457,11 @@ function ResultsContent() {
 
                         <div className="relative z-10 flex flex-col items-center gap-10 w-full px-12">
                             <div className="w-[800px] h-[800px] rounded-3xl overflow-hidden shadow-2xl border-4 border-white/10 relative">
-                                <img 
-                                    src={displayImage} 
-                                    alt="Cover" 
-                                    crossOrigin="anonymous" 
-                                    className="w-full h-full object-cover" 
+                                <img
+                                    src={displayImage}
+                                    alt="Cover"
+                                    crossOrigin="anonymous"
+                                    className="w-full h-full object-cover"
                                 />
                                 <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 to-transparent p-10 pt-32">
                                     <h1 className="text-7xl font-bold text-white leading-tight mb-4">{data.playlist_name}</h1>
