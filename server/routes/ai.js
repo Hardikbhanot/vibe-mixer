@@ -16,6 +16,7 @@ const upload = multer({
 
 const router = express.Router();
 
+// --- 1. Image Generation Route ---
 router.post('/image', async (req, res) => {
     try {
         const { prompt } = req.body;
@@ -30,6 +31,7 @@ router.post('/image', async (req, res) => {
     }
 });
 
+// --- 2. Main Playlist Analysis Route ---
 router.post('/analyze', initSpotifyApi, async (req, res) => {
     console.log('POST /ai/analyze hit');
     const { mood, duration = 60, vibeType = 'mix', energy, tempo, valence } = req.body;
@@ -45,9 +47,9 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
 
         console.log(`Targeting ~${targetTrackCount} tracks for ${duration} mins`);
 
-        // 1. Generate parameters using Groq
+        // 1. Generate parameters using Groq (Now returns 'reason' in suggestions)
         const aiParams = await generatePlaylistParams(mood, vibeType, targetTrackCount, { energy, tempo, valence });
-        console.log('AI Params:', aiParams);
+        console.log('AI Params Generated');
 
         // 2. Search Spotify for each suggested track
         const trackPromises = aiParams.suggested_tracks.map(async (suggestion) => {
@@ -58,7 +60,13 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
 
                 // Return the first match if found
                 if (searchResult.body.tracks.items.length > 0) {
-                    return searchResult.body.tracks.items[0];
+                    const spotifyTrack = searchResult.body.tracks.items[0];
+                    
+                    // ✅ KEY UPDATE: Merge the AI's reason with the Spotify data
+                    return {
+                        ...spotifyTrack,
+                        ai_reason: suggestion.reason || "Fits the vibe perfectly." 
+                    };
                 }
                 return null;
             } catch (err) {
@@ -73,8 +81,7 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
         const foundTracks = searchResults.filter(track => track !== null);
         const uniqueTracks = Array.from(new Map(foundTracks.map(track => [track.id, track])).values());
 
-        // 3. Filter and Sort (We still filter duration, but trust AI for popularity)
-        // Note: We don't sort by popularity here because the AI order is the curated order.
+        // 3. Filter and Sort (Trust AI order, but filter crazy long songs)
         const filteredTracks = uniqueTracks.filter(track => track.duration_ms < 600000);
 
         // 4. Select tracks to fill duration
@@ -95,8 +102,7 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
         // 5. Return combined data
         res.json({
             ...aiParams,
-            tracks: finalTracks,
-            tracks: finalTracks,
+            tracks: finalTracks, // Contains .ai_reason
             total_duration_mins: Math.round(currentDurationMs / 60000),
             isGuest: req.isGuest // Return auth status to frontend
         });
@@ -107,6 +113,7 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
     }
 });
 
+// --- 3. Image Analysis Route ---
 router.post('/analyze-image', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
@@ -117,7 +124,6 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
         const mimeType = req.file.mimetype; // e.g., 'image/png'
         const moodDescription = await analyzeImage(base64Image, mimeType);
 
-        // Memory is automatically cleared when request ends (buffer is garbage collected)
         res.json({ mood: moodDescription });
     } catch (error) {
         console.error('Image analysis error:', error);
@@ -125,9 +131,7 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
     }
 });
 
-
-
-// Refine Playlist based on Swipe History
+// --- 4. Refine Playlist Route (Swipe History) ---
 router.post('/refine', authenticateToken, initSpotifyApi, async (req, res) => {
     try {
         const userId = req.user.userId;
@@ -146,7 +150,7 @@ router.post('/refine', authenticateToken, initSpotifyApi, async (req, res) => {
             return res.status(400).json({ error: 'No swipe history found. Swipe some songs first!' });
         }
 
-        // Construct Prompt
+        // Construct Prompt Context
         const likes = history.filter(h => h.action === 'LIKE').map(h => `${h.songName} by ${h.artistName}`);
         const superlikes = history.filter(h => h.action === 'SUPERLIKE').map(h => `${h.songName} by ${h.artistName}`);
 
@@ -161,10 +165,7 @@ router.post('/refine', authenticateToken, initSpotifyApi, async (req, res) => {
         const refineMood = `Based on these user preferences: ${promptContext}. Generate a playlist that blends these styles perfectly.`;
 
         // Reuse existing generation logic
-        // We set a default duration if not provided
         const duration = 60;
-
-        // Calculate target number of tracks (avg song ~3.5 mins) + 20% buffer
         const avgSongLengthMins = 3.5;
         const targetTrackCount = Math.ceil((duration / avgSongLengthMins) * 1.2);
 
@@ -176,8 +177,14 @@ router.post('/refine', authenticateToken, initSpotifyApi, async (req, res) => {
             try {
                 const query = `track:${suggestion.song} artist:${suggestion.artist}`;
                 const searchResult = await req.spotifyApi.searchTracks(query, { limit: 1 });
+                
                 if (searchResult.body.tracks.items.length > 0) {
-                    return searchResult.body.tracks.items[0];
+                    const spotifyTrack = searchResult.body.tracks.items[0];
+                    // ✅ KEY UPDATE: Merge AI Reason here too
+                    return {
+                        ...spotifyTrack,
+                        ai_reason: suggestion.reason || "Selected based on your unique listening history."
+                    };
                 }
                 return null;
             } catch (err) {
@@ -203,7 +210,7 @@ router.post('/refine', authenticateToken, initSpotifyApi, async (req, res) => {
 
         res.json({
             ...aiParams,
-            tracks: finalTracks,
+            tracks: finalTracks, // Contains .ai_reason
             total_duration_mins: Math.round(currentDurationMs / 60000),
             isGuest: false // Authenticated user
         });
