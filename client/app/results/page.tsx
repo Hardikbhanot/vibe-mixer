@@ -289,7 +289,7 @@ function ResultsContent() {
         if (platform === 'spotify') {
             window.open(track.external_urls.spotify, '_blank');
         } else if (platform === 'youtube') {
-            window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(track.name + ' ' + track.artists[0].name)}`, '_blank');
+            window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(track.name + ' ' + (track.artist || track.artists?.[0]?.name || ''))}`, '_blank');
         } else {
             setSelectedTrackForPlay(track);
             setShowPlatformModal(true);
@@ -305,7 +305,7 @@ function ResultsContent() {
             if (platform === 'spotify') {
                 window.open(selectedTrackForPlay.external_urls.spotify, '_blank');
             } else {
-                window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedTrackForPlay.name + ' ' + selectedTrackForPlay.artists[0].name)}`, '_blank');
+                window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedTrackForPlay.name + ' ' + (selectedTrackForPlay.artist || selectedTrackForPlay.artists?.[0]?.name || ''))}`, '_blank');
             }
         }
         setShowPlatformModal(false);
