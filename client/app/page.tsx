@@ -76,10 +76,10 @@ export default function Home() {
                                     </div>
                                     <div>
                                         <h3 className="text-foreground text-lg font-bold leading-tight">
-                                            Export to Spotify
+                                            Export to Spotify & YouTube
                                         </h3>
                                         <p className="text-muted-foreground text-sm font-normal leading-normal mt-2">
-                                            Save your new playlist directly to your Spotify account with one click.
+                                            Save your new playlist directly to your Spotify or YouTube library with one click.
                                         </p>
                                     </div>
                                 </div>

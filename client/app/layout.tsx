@@ -36,6 +36,9 @@ export const metadata: Metadata = {
     description: "Turn your mood into a Spotify & YouTube playlist instantly.",
     images: ['/og-image.png'],
   },
+  verification: {
+    google: "wZmbGnOy0DWHNyrRjwdijH-V0AWXUi-R8eL-eEfTfV8",
+  },
 };
 
 // ... imports
