@@ -64,12 +64,16 @@ router.post('/register', async (req, res) => {
 
         const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
 
+        const isProduction = process.env.NODE_ENV === 'production';
+        const domain = isProduction ? '.vibemixer.hbhanot.tech' : undefined;
+
         res.cookie('auth_token', token, {
             httpOnly: true,
             secure: true,
             maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
             path: '/',
-            sameSite: 'none'
+            sameSite: 'none',
+            domain: domain
         });
 
         res.status(201).json({ message: 'User created successfully', user: { id: user.id, email: user.email } });
@@ -97,12 +101,16 @@ router.post('/login', async (req, res) => {
 
         const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
 
+        const isProduction = process.env.NODE_ENV === 'production';
+        const domain = isProduction ? '.vibemixer.hbhanot.tech' : undefined;
+
         res.cookie('auth_token', token, {
             httpOnly: true,
             secure: true,
             maxAge: 30 * 24 * 60 * 60 * 1000,
             path: '/',
-            sameSite: 'none'
+            sameSite: 'none',
+            domain: domain
         });
 
         res.json({ message: 'Login successful', user: { id: user.id, email: user.email } });
@@ -321,13 +329,17 @@ router.get('/google/callback', async (req, res) => {
         // Generate App Session Token
         const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
 
+        const isProduction = process.env.NODE_ENV === 'production';
+        const domain = isProduction ? '.vibemixer.hbhanot.tech' : undefined;
+
         // Set Auth Token Cookie
         res.cookie('auth_token', token, {
             httpOnly: true,
             secure: true,
             maxAge: 30 * 24 * 60 * 60 * 1000,
             path: '/',
-            sameSite: 'none'
+            sameSite: 'none',
+            domain: domain
         });
 
         // Set tokens in cookies
@@ -336,7 +348,8 @@ router.get('/google/callback', async (req, res) => {
             secure: true,
             maxAge: expires_in * 1000,
             path: '/',
-            sameSite: 'none'
+            sameSite: 'none',
+            domain: domain
         });
 
         if (refresh_token) {
@@ -344,7 +357,8 @@ router.get('/google/callback', async (req, res) => {
                 httpOnly: true,
                 secure: true,
                 path: '/',
-                sameSite: 'none'
+                sameSite: 'none',
+                domain: domain
             });
         }
 
