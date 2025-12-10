@@ -175,10 +175,8 @@ function ResultsContent() {
 
             const response = await fetch(`${apiUrl}/api/playlists`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({
                     name: data.playlist_name,
                     description: data.playlist_description,

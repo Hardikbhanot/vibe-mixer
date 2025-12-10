@@ -1,67 +1,83 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-interface User {
-    id: string;
-    email: string;
-}
-
-interface AuthContextType {
-    user: User | null;
-    loading: boolean;
-    refreshAuth: () => Promise<void>;
-    logout: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType>({
-    user: null,
-    loading: true,
-    refreshAuth: async () => { },
-    logout: async () => { },
-});
+const AuthContext = createContext<any>(null);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
-    const refreshAuth = async () => {
-        try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
-            const res = await fetch(`${apiUrl}/auth/me`, { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setUser(data.user);
-            } else {
-                setUser(null);
-            }
-        } catch (error) {
-            console.error('Auth check failed', error);
-            setUser(null);
-        } finally {
-            setLoading(false);
-        }
-    };
+  // 1. Check if user is logged in on page load (Restores session from Cookie)
+  useEffect(() => {
+    checkUserLoggedIn();
+  }, []);
 
-    const logout = async () => {
-        try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
-            await fetch(`${apiUrl}/auth/logout`, { method: 'POST', credentials: 'include' });
-            setUser(null);
-        } catch (error) {
-            console.error('Logout failed', error);
-        }
-    };
+  const checkUserLoggedIn = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+      // credentials: 'include' sends the HttpOnly cookie to the /me endpoint
+      const res = await fetch(`${apiUrl}/api/auth/me`, { credentials: 'include' });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data.user); // Restore user data (e.g. email, id)
+      } else {
+        setUser(null);
+      }
+    } catch (error) {
+      console.error("Session check failed", error);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    useEffect(() => {
-        refreshAuth();
-    }, []);
+  const login = async (email: any, password: any) => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+      const res = await fetch(`${apiUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include' // Important: Allows server to set the cookie
+      });
 
-    return (
-        <AuthContext.Provider value={{ user, loading, refreshAuth, logout }}>
-            {children}
-        </AuthContext.Provider>
-    );
+      const data = await res.json();
+
+      if (res.ok) {
+        setUser(data.user);
+        router.push('/generate'); // Redirect after login
+        return { success: true };
+      } else {
+        return { success: false, error: data.error };
+      }
+    } catch (error) {
+      return { success: false, error: "Network error" };
+    }
+  };
+
+  const logout = async () => {
+    try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+        await fetch(`${apiUrl}/api/auth/logout`, { 
+            method: 'POST', 
+            credentials: 'include' 
+        });
+        setUser(null);
+        router.push('/auth');
+    } catch (error) {
+        console.error("Logout failed", error);
+    }
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => useContext(AuthContext);
