@@ -10,6 +10,27 @@ router.post('/', authenticateToken, async (req, res) => {
     try {
         const { name, description, coverImage, mood, tracks } = req.body;
         const userId = req.user.userId; // Extracted from JWT
+        console.log(`[Playlist] Saving for user ${userId}: ${name}`);
+
+        // Validate User Existence (Fix for Stale Token/DB Reset)
+        const userExists = await prisma.user.findUnique({ where: { id: userId } });
+        if (!userExists) {
+            console.warn(`[Playlist] User ${userId} not found in DB. Stale token?`);
+            return res.status(401).json({ error: 'User not found. Please re-login.' });
+        }
+
+        // Check for duplicates (Idempotency)
+        const existingPlaylist = await prisma.playlist.findFirst({
+            where: {
+                userId,
+                name: name
+            }
+        });
+
+        if (existingPlaylist) {
+            console.log(`[Playlist] Duplicate found for ${name}, returning existing.`);
+            return res.json({ message: 'Playlist already saved!', playlist: existingPlaylist });
+        }
 
         const playlist = await prisma.playlist.create({
             data: {
@@ -17,7 +38,7 @@ router.post('/', authenticateToken, async (req, res) => {
                 description,
                 coverImage,
                 mood,
-                tracks, // Prisma automatically handles the JSON conversion
+                tracks: tracks || [], // Ensure tracks is at least an empty array
                 userId
             }
         });
@@ -25,7 +46,7 @@ router.post('/', authenticateToken, async (req, res) => {
         res.json({ message: 'Playlist saved to history!', playlist });
     } catch (error) {
         console.error('Save playlist error:', error);
-        res.status(500).json({ error: 'Failed to save playlist' });
+        res.status(500).json({ error: 'Failed to save playlist', details: error.message });
     }
 });
 
@@ -55,7 +76,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         // Ensure user owns the playlist
         const count = await prisma.playlist.deleteMany({
             where: {
-                id: parseInt(id),
+                id: id, // Fixed: UUID is a string, do not parseInt
                 userId // Security check
             }
         });
@@ -66,6 +87,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 
         res.json({ message: 'Playlist deleted' });
     } catch (error) {
+        console.error('Delete playlist error:', error);
         res.status(500).json({ error: 'Failed to delete' });
     }
 });

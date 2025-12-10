@@ -27,4 +27,8 @@
   body {
     @apply bg-background-light dark:bg-background-dark text-gray-900 dark:text-white font-display;
   }
+  
+  button, a, [role="button"] {
+    cursor: pointer;
+  }
 }

@@ -10,20 +10,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // 1. Check if user is logged in on page load (Restores session from Cookie)
   useEffect(() => {
     checkUserLoggedIn();
   }, []);
 
   const checkUserLoggedIn = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
-      // credentials: 'include' sends the HttpOnly cookie to the /me endpoint
-      const res = await fetch(`${apiUrl}/api/auth/me`, { credentials: 'include' });
-      
+      const apiUrl = ''; // Relative path because of Next.js Rewrite Proxy
+      const res = await fetch(`${apiUrl}/auth/me`, { credentials: 'include' });
+
       if (res.ok) {
         const data = await res.json();
-        setUser(data.user); // Restore user data (e.g. email, id)
+        setUser(data.user);
       } else {
         setUser(null);
       }
@@ -37,19 +35,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = async (email: any, password: any) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
-      const res = await fetch(`${apiUrl}/api/auth/login`, {
+      const apiUrl = '';
+      const res = await fetch(`${apiUrl}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
-        credentials: 'include' // Important: Allows server to set the cookie
+        credentials: 'include'
       });
 
       const data = await res.json();
 
       if (res.ok) {
         setUser(data.user);
-        router.push('/generate'); // Redirect after login
+        router.push('/generate');
         return { success: true };
       } else {
         return { success: false, error: data.error };
@@ -61,15 +59,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
-        await fetch(`${apiUrl}/api/auth/logout`, { 
-            method: 'POST', 
-            credentials: 'include' 
-        });
-        setUser(null);
-        router.push('/auth');
+      const apiUrl = '';
+      await fetch(`${apiUrl}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      setUser(null);
+      router.push('/auth');
     } catch (error) {
-        console.error("Logout failed", error);
+      console.error("Logout failed", error);
     }
   };
 
