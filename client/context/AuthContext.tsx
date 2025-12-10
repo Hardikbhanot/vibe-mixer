@@ -16,7 +16,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const checkUserLoggedIn = async () => {
     try {
-      const apiUrl = ''; // Relative path because of Next.js Rewrite Proxy
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
       const res = await fetch(`${apiUrl}/auth/me`, { credentials: 'include' });
 
       if (res.ok) {
