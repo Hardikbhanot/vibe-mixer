@@ -101,30 +101,61 @@ function ResultsContent() {
         }
     };
 
-    // ✅ 2. NEW SHARE FUNCTION ADDED HERE
-    const handleShareToInstagram = async () => {
+   const handleShareToInstagram = async () => {
         if (!data) return;
         setIsSharing(true);
+        
         try {
             const element = document.getElementById('instagram-story-card');
             if (!element) throw new Error('Card not found');
 
+            
+            const imgElement = element.querySelector('img');
+            const originalSrc = imgElement?.src;
+
+            if (imgElement && originalSrc) {
+                try {
+                    const response = await fetch(originalSrc, { mode: 'cors' });
+                    const blob = await response.blob();
+                    const base64Url = await new Promise<string>((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result as string);
+                        reader.readAsDataURL(blob);
+                    });
+                    
+                    imgElement.src = base64Url;
+                } catch (e) {
+                    console.warn("Base64 conversion failed, trying standard capture...", e);
+                }
+            }
+
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            
             const canvas = await html2canvas(element, {
-                useCORS: true,
-                scale: 2,
+                useCORS: true, 
+                scale: 2, 
                 backgroundColor: '#000000',
+                allowTaint: true, 
+                logging: false,
             });
 
+            
+            if (imgElement && originalSrc) imgElement.src = originalSrc;
+
+            
             const image = canvas.toDataURL("image/png");
             const link = document.createElement('a');
             link.href = image;
-            link.download = `VibeMixer-${data.playlist_name.replace(/\s+/g, '-')}.png`;
+            link.download = `VibeMixer-Story-${Date.now()}.png`;
             link.click();
 
-            toast.success("Story card downloaded! Ready to post.");
+            toast.success("Story card downloaded!");
+
         } catch (error) {
             console.error("Share failed:", error);
-            toast.error("Failed to generate image.");
+            toast.error("Failed to generate image. Check console for details.");
         } finally {
             setIsSharing(false);
         }
