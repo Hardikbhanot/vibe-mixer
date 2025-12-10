@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Header } from "@/components/Header";
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import html2canvas from "html2canvas"; // ✅ 1. IMPORT ADDED
 
 // --- Types ---
 interface Track {
@@ -40,6 +41,7 @@ function ResultsContent() {
     const [error, setError] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isSavingYoutube, setIsSavingYoutube] = useState(false);
+    const [isSharing, setIsSharing] = useState(false); // ✅ ADDED STATE
     const [coverImage, setCoverImage] = useState<string | null>(null);
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     const [showPlatformModal, setShowPlatformModal] = useState(false);
@@ -96,6 +98,35 @@ function ResultsContent() {
             toast.error('AI generation failed. Using fallback cover.');
         } finally {
             setIsGeneratingImage(false);
+        }
+    };
+
+    // ✅ 2. NEW SHARE FUNCTION ADDED HERE
+    const handleShareToInstagram = async () => {
+        if (!data) return;
+        setIsSharing(true);
+        try {
+            const element = document.getElementById('instagram-story-card');
+            if (!element) throw new Error('Card not found');
+
+            const canvas = await html2canvas(element, {
+                useCORS: true, 
+                scale: 2, 
+                backgroundColor: '#000000', 
+            });
+
+            const image = canvas.toDataURL("image/png");
+            const link = document.createElement('a');
+            link.href = image;
+            link.download = `VibeMixer-${data.playlist_name.replace(/\s+/g, '-')}.png`;
+            link.click();
+
+            toast.success("Story card downloaded! Ready to post.");
+        } catch (error) {
+            console.error("Share failed:", error);
+            toast.error("Failed to generate image.");
+        } finally {
+            setIsSharing(false);
         }
     };
 
@@ -215,7 +246,6 @@ function ResultsContent() {
 
             <main className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full">
 
-                {/* Refine / Swipe CTA */}
                 <div className="flex flex-col gap-4 mb-8">
                     <button
                         onClick={() => {
@@ -232,7 +262,6 @@ function ResultsContent() {
                     </button>
                 </div>
 
-                {/* Playlist Header Info */}
                 <div className="flex flex-col md:flex-row gap-6 items-center md:items-start mb-8">
                     <div className="shrink-0 relative w-48 h-48 md:w-56 md:h-56">
                         {(!imageLoaded || isGeneratingImage) && (
@@ -273,11 +302,20 @@ function ResultsContent() {
                                 <span className="material-symbols-outlined text-xl">play_circle</span>
                                 {isSavingYoutube ? 'Creating...' : 'Save to YouTube'}
                             </button>
+                            
+                            {/* ✅ 3. NEW SHARE BUTTON ADDED HERE */}
+                            <button 
+                                onClick={handleShareToInstagram} 
+                                disabled={isSharing}
+                                className="flex items-center justify-center gap-2 h-10 px-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-bold rounded-full hover:scale-105 transition-transform disabled:opacity-50"
+                            >
+                                <span className="material-symbols-outlined text-xl">ios_share</span>
+                                {isSharing ? 'Generating...' : 'Share Story'}
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                {/* Track List */}
                 <div className="flex flex-col gap-2">
                     <h3 className="text-foreground text-xl font-bold mb-4 px-2">Track List</h3>
                     {data.tracks.map((track, index) => (
@@ -299,10 +337,11 @@ function ResultsContent() {
                                 <p className="text-foreground text-base font-medium truncate group-hover:text-primary transition-colors">{track.name}</p>
                                 <p className="text-muted-foreground text-sm truncate">{track.artists.map(a => a.name).join(', ')}</p>
                                 
-                                {/* ✅ UPDATED AI REASON: Fully visible on mobile */}
                                 {track.ai_reason && (
-                                    <div className="mt-2 flex items-start gap-1.5 p-2 rounded-lg bg-primary/5 border border-primary/10">
-                                        <span className="material-symbols-outlined text-[14px] text-primary mt-0.5 shrink-0 select-none">auto_awesome</span>
+                                    <div className="mt-2 flex items-start gap-1.5 p-2 rounded-lg bg-primary/5 border border-primary/10 opacity-90 group-hover:opacity-100 transition-opacity">
+                                        <span className="material-symbols-outlined text-[14px] text-primary mt-0.5 shrink-0 select-none">
+                                            auto_awesome
+                                        </span>
                                         <p className="text-xs text-primary/90 italic leading-relaxed whitespace-normal break-words">
                                             {track.ai_reason}
                                         </p>
@@ -324,7 +363,6 @@ function ResultsContent() {
                     </Link>
                 </div>
 
-                {/* Music Platform Modal */}
                 {showPlatformModal && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                         <div className="bg-surface-light dark:bg-surface-dark p-6 rounded-2xl shadow-2xl max-w-sm w-full animate-in fade-in zoom-in-95 duration-200">
@@ -352,6 +390,64 @@ function ResultsContent() {
                             <button onClick={() => setShowPlatformModal(false)} className="w-full py-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg text-sm text-muted-foreground font-medium transition-colors">
                                 Cancel
                             </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* ✅ 4. HIDDEN INSTAGRAM CARD (Added at very bottom) */}
+                {data && (
+                    <div 
+                        id="instagram-story-card" 
+                        className="fixed top-0 left-0 -z-50 w-[1080px] h-[1920px] bg-black text-white p-16 flex flex-col items-center justify-between font-sans"
+                        style={{ transform: 'translateX(-9999px)' }} 
+                    >
+                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-black opacity-80"></div>
+                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30"></div>
+
+                        <div className="relative z-10 flex flex-col items-center gap-6 mt-20">
+                            <div className="px-8 py-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20">
+                                <span className="text-3xl font-bold tracking-widest uppercase">My Vibe Today</span>
+                            </div>
+                        </div>
+
+                        <div className="relative z-10 flex flex-col items-center gap-10 w-full px-12">
+                            <div className="w-[800px] h-[800px] rounded-3xl overflow-hidden shadow-2xl border-4 border-white/10 relative">
+                                <img 
+                                    src={displayImage} 
+                                    alt="Cover" 
+                                    crossOrigin="anonymous" 
+                                    className="w-full h-full object-cover" 
+                                />
+                                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 to-transparent p-10 pt-32">
+                                    <h1 className="text-7xl font-bold text-white leading-tight mb-4">{data.playlist_name}</h1>
+                                    <p className="text-3xl text-gray-300 font-medium italic">"{data.playlist_description}"</p>
+                                </div>
+                            </div>
+
+                            <div className="w-full flex flex-col gap-6 mt-8">
+                                <p className="text-2xl text-gray-400 font-bold uppercase tracking-wider ml-2">Featuring</p>
+                                {data.tracks.slice(0, 3).map((track, i) => (
+                                    <div key={i} className="flex items-center gap-6 p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/5">
+                                        <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-primary to-purple-500 flex items-center justify-center font-bold text-2xl">
+                                            {i + 1}
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-4xl font-bold truncate max-w-[600px]">{track.name}</span>
+                                            <span className="text-2xl text-gray-400">{track.artists[0].name}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="relative z-10 mb-20 flex flex-col items-center gap-4">
+                            <p className="text-3xl font-medium text-gray-400">Generated by</p>
+                            <div className="flex items-center gap-4">
+                                <span className="text-6xl font-black bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-400">
+                                    VibeMixer
+                                </span>
+                            </div>
+                            <p className="text-2xl text-gray-500 mt-2">vibemixer.tech</p>
                         </div>
                     </div>
                 )}
