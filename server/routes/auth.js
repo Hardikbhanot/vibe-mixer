@@ -191,13 +191,16 @@ router.get('/callback', async (req, res) => {
 
         const isProduction = process.env.NODE_ENV === 'production';
 
+        const domain = isProduction ? '.vibemixer.hbhanot.tech' : undefined;
+
         // Set Auth Token Cookie (Critical for app login)
         res.cookie('auth_token', token, {
             httpOnly: true,
             secure: isProduction ? true : false, // Secure only in prod
             maxAge: 30 * 24 * 60 * 60 * 1000,
             path: '/',
-            sameSite: isProduction ? 'none' : 'lax' // None requires Secure
+            sameSite: isProduction ? 'none' : 'lax', // None requires Secure
+            domain: domain
         });
 
         // Set Spotify tokens in cookies
@@ -206,14 +209,16 @@ router.get('/callback', async (req, res) => {
             secure: isProduction ? true : false,
             maxAge: expires_in * 1000,
             path: '/',
-            sameSite: isProduction ? 'none' : 'lax'
+            sameSite: isProduction ? 'none' : 'lax',
+            domain: domain
         });
 
         res.cookie('spotify_refresh_token', refresh_token, {
             httpOnly: true,
             secure: isProduction ? true : false,
             path: '/',
-            sameSite: isProduction ? 'none' : 'lax'
+            sameSite: isProduction ? 'none' : 'lax',
+            domain: domain
         });
 
         // Redirect back to frontend
