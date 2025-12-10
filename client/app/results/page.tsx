@@ -101,15 +101,15 @@ function ResultsContent() {
         }
     };
 
-   const handleShareToInstagram = async () => {
+    const handleShareToInstagram = async () => {
         if (!data) return;
         setIsSharing(true);
-        
+
         try {
             const element = document.getElementById('instagram-story-card');
             if (!element) throw new Error('Card not found');
 
-            
+
             const imgElement = element.querySelector('img');
             const originalSrc = imgElement?.src;
 
@@ -122,29 +122,29 @@ function ResultsContent() {
                         reader.onloadend = () => resolve(reader.result as string);
                         reader.readAsDataURL(blob);
                     });
-                    
+
                     imgElement.src = base64Url;
                 } catch (e) {
                     console.warn("Base64 conversion failed, trying standard capture...", e);
                 }
             }
 
-            
+
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            
+
             const canvas = await html2canvas(element, {
-                useCORS: true, 
-                scale: 2, 
+                useCORS: true,
+                scale: 2,
                 backgroundColor: '#000000',
-                allowTaint: true, 
+                allowTaint: true,
                 logging: false,
             });
 
-            
+
             if (imgElement && originalSrc) imgElement.src = originalSrc;
 
-            
+
             const image = canvas.toDataURL("image/png");
             const link = document.createElement('a');
             link.href = image;
@@ -169,7 +169,7 @@ function ResultsContent() {
 
             if (!token) {
                 toast.error("Please login to save to library");
-                router.push('/auth/login');
+                router.push('/auth');
                 return;
             }
 
@@ -379,7 +379,12 @@ function ResultsContent() {
                                 <span className="material-symbols-outlined text-xl">bookmark</span>
                                 Save to Library
                             </button>
-
+                            <button
+                                onClick={() => alert(localStorage.getItem('token') || 'No Token Found')}
+                                className="fixed bottom-4 right-4 bg-red-500 text-white p-4 rounded-full z-[9999]"
+                            >
+                                Check Token
+                            </button>
                             <button
                                 onClick={handleShareToInstagram}
                                 disabled={isSharing}
