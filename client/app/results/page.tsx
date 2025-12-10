@@ -18,7 +18,7 @@ interface Track {
     uri: string;
     duration_ms: number;
     external_urls: { spotify: string };
-    ai_reason?: string; // ✅ Added AI Reason field
+    ai_reason?: string; 
 }
 
 interface PlaylistData {
@@ -30,7 +30,7 @@ interface PlaylistData {
     isGuest?: boolean;
 }
 
-// --- Inner Component (Contains the Logic) ---
+// --- Inner Component ---
 function ResultsContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -48,7 +48,6 @@ function ResultsContent() {
 
     useEffect(() => {
         const storedData = localStorage.getItem('playlistData');
-        console.log('Retrieved from localStorage:', storedData);
 
         if (storedData) {
             try {
@@ -285,30 +284,33 @@ function ResultsContent() {
                         <div
                             key={track.id}
                             onClick={() => handlePlayTrack(track)}
-                            className="flex items-center gap-4 p-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors group cursor-pointer"
+                            className="flex items-start gap-4 p-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors group cursor-pointer"
                         >
-                            <span className="text-muted-foreground w-6 text-center text-sm font-medium">{index + 1}</span>
-                            <div className="relative w-12 h-12 rounded-md shadow-sm overflow-hidden group-hover:scale-105 transition-transform shrink-0">
+                            <span className="text-muted-foreground w-6 text-center text-sm font-medium mt-3">{index + 1}</span>
+                            
+                            <div className="relative w-12 h-12 rounded-md shadow-sm overflow-hidden group-hover:scale-105 transition-transform shrink-0 mt-1">
                                 <img src={track.album.images[2]?.url || track.album.images[0]?.url} alt={track.name} className="w-full h-full object-cover" />
                                 <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                     <span className="material-symbols-outlined text-white text-xl">play_arrow</span>
                                 </div>
                             </div>
+                            
                             <div className="flex-1 min-w-0">
                                 <p className="text-foreground text-base font-medium truncate group-hover:text-primary transition-colors">{track.name}</p>
                                 <p className="text-muted-foreground text-sm truncate">{track.artists.map(a => a.name).join(', ')}</p>
                                 
-                                {/* ✅ AI REASON DISPLAY (Blending In) */}
+                                {/* ✅ UPDATED AI REASON: Fully visible on mobile */}
                                 {track.ai_reason && (
-                                    <div className="mt-1.5 flex items-start gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                                        <span className="material-symbols-outlined text-[14px] text-primary mt-0.5 select-none">auto_awesome</span>
-                                        <p className="text-xs text-primary/90 italic leading-snug line-clamp-2">
+                                    <div className="mt-2 flex items-start gap-1.5 p-2 rounded-lg bg-primary/5 border border-primary/10">
+                                        <span className="material-symbols-outlined text-[14px] text-primary mt-0.5 shrink-0 select-none">auto_awesome</span>
+                                        <p className="text-xs text-primary/90 italic leading-relaxed whitespace-normal break-words">
                                             {track.ai_reason}
                                         </p>
                                     </div>
                                 )}
                             </div>
-                            <div className="text-muted-foreground text-sm font-variant-numeric tabular-nums whitespace-nowrap">
+                            
+                            <div className="text-muted-foreground text-sm font-variant-numeric tabular-nums whitespace-nowrap mt-3">
                                 {Math.floor(track.duration_ms / 60000)}:{((track.duration_ms % 60000) / 1000).toFixed(0).padStart(2, '0')}
                             </div>
                         </div>
