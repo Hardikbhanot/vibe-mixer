@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { toast } from "sonner";
 import { Header } from "@/components/Header";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -19,6 +18,7 @@ interface Track {
     uri: string;
     duration_ms: number;
     external_urls: { spotify: string };
+    ai_reason?: string; // ✅ Added AI Reason field
 }
 
 interface PlaylistData {
@@ -31,7 +31,6 @@ interface PlaylistData {
 }
 
 // --- Inner Component (Contains the Logic) ---
-// We move the main logic here so we can wrap it in Suspense later
 function ResultsContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -48,10 +47,6 @@ function ResultsContent() {
     const [imageLoaded, setImageLoaded] = useState(false);
 
     useEffect(() => {
-        if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-            // Fix locally
-        }
-
         const storedData = localStorage.getItem('playlistData');
         console.log('Retrieved from localStorage:', storedData);
 
@@ -172,7 +167,7 @@ function ResultsContent() {
         }
     };
 
-    if (loading) return <div>Loading...</div>;
+    if (loading) return <div className="flex h-screen items-center justify-center">Loading your vibe...</div>;
 
     if (error || !data) {
         return (
@@ -185,11 +180,7 @@ function ResultsContent() {
         );
     }
 
-    // Use state image if available, otherwise construct a stable fallback (without random seed to avoid hydration mismatch)
     const displayImage = coverImage || (data ? `https://image.pollinations.ai/prompt/${encodeURIComponent(data.cover_art_description || data.playlist_name)}?width=512&height=512&nologo=true` : '');
-
-
-
 
     const handlePlayTrack = (track: Track) => {
         const platform = localStorage.getItem('musicPlatform');
@@ -225,28 +216,25 @@ function ResultsContent() {
 
             <main className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full">
 
-                {/* Tinder-style Swiping Call to Action */}
+                {/* Refine / Swipe CTA */}
                 <div className="flex flex-col gap-4 mb-8">
-                    <div className="flex flex-col gap-4 mb-8">
-                        <button
-                            onClick={() => {
-                                if (data.isGuest) {
-                                    router.push('/auth?next=/swipe');
-                                } else {
-                                    router.push('/swipe');
-                                }
-                            }}
-                            className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary to-secondary text-white font-bold text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
-                        >
-                            <span className="material-symbols-outlined text-2xl">graphic_eq</span>
-                            {data.isGuest ? 'Login to Refine' : 'Refine Your Vibe'}
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => {
+                            if (data.isGuest) {
+                                router.push('/auth?next=/swipe');
+                            } else {
+                                router.push('/swipe');
+                            }
+                        }}
+                        className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary to-secondary text-white font-bold text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                    >
+                        <span className="material-symbols-outlined text-2xl">graphic_eq</span>
+                        {data.isGuest ? 'Login to Refine' : 'Refine Your Vibe'}
+                    </button>
                 </div>
 
-                {/* Playlist Header */}
+                {/* Playlist Header Info */}
                 <div className="flex flex-col md:flex-row gap-6 items-center md:items-start mb-8">
-                    {/* ... (Existing Header UI) ... */}
                     <div className="shrink-0 relative w-48 h-48 md:w-56 md:h-56">
                         {(!imageLoaded || isGeneratingImage) && (
                             <div className="absolute inset-0 bg-surface-light dark:bg-surface-dark rounded-xl animate-pulse flex items-center justify-center overflow-hidden">
@@ -272,12 +260,12 @@ function ResultsContent() {
                         </div>
                         <div className="flex flex-wrap gap-3 justify-center md:justify-start">
                             {!data.isGuest ? (
-                                <button onClick={handleSaveToSpotify} disabled={isSaving} className="flex items-center justify-center gap-2 h-10 px-6 bg-spotify text-white text-sm font-bold rounded-full hover:scale-105 transition-transform disabled:opacity-50">
+                                <button onClick={handleSaveToSpotify} disabled={isSaving} className="flex items-center justify-center gap-2 h-10 px-6 bg-[#1DB954] text-white text-sm font-bold rounded-full hover:scale-105 transition-transform disabled:opacity-50">
                                     <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_White.png" alt="Spotify" className="h-5 w-auto" />
                                     {isSaving ? 'Saving...' : 'Save to Spotify'}
                                 </button>
                             ) : (
-                                <button onClick={() => { const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000'; window.location.href = `${apiUrl}/auth/login`; }} className="flex items-center justify-center gap-2 h-10 px-6 bg-transparent border border-spotify text-spotify text-sm font-bold rounded-full hover:bg-spotify hover:text-white transition-colors">
+                                <button onClick={() => { const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000'; window.location.href = `${apiUrl}/auth/login`; }} className="flex items-center justify-center gap-2 h-10 px-6 bg-transparent border border-[#1DB954] text-[#1DB954] text-sm font-bold rounded-full hover:bg-[#1DB954] hover:text-white transition-colors">
                                     <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_Green.png" alt="Spotify" className="h-5 w-auto" />
                                     Login to Save
                                 </button>
@@ -290,6 +278,7 @@ function ResultsContent() {
                     </div>
                 </div>
 
+                {/* Track List */}
                 <div className="flex flex-col gap-2">
                     <h3 className="text-foreground text-xl font-bold mb-4 px-2">Track List</h3>
                     {data.tracks.map((track, index) => (
@@ -299,7 +288,7 @@ function ResultsContent() {
                             className="flex items-center gap-4 p-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors group cursor-pointer"
                         >
                             <span className="text-muted-foreground w-6 text-center text-sm font-medium">{index + 1}</span>
-                            <div className="relative w-12 h-12 rounded-md shadow-sm overflow-hidden group-hover:scale-105 transition-transform">
+                            <div className="relative w-12 h-12 rounded-md shadow-sm overflow-hidden group-hover:scale-105 transition-transform shrink-0">
                                 <img src={track.album.images[2]?.url || track.album.images[0]?.url} alt={track.name} className="w-full h-full object-cover" />
                                 <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                     <span className="material-symbols-outlined text-white text-xl">play_arrow</span>
@@ -308,8 +297,18 @@ function ResultsContent() {
                             <div className="flex-1 min-w-0">
                                 <p className="text-foreground text-base font-medium truncate group-hover:text-primary transition-colors">{track.name}</p>
                                 <p className="text-muted-foreground text-sm truncate">{track.artists.map(a => a.name).join(', ')}</p>
+                                
+                                {/* ✅ AI REASON DISPLAY (Blending In) */}
+                                {track.ai_reason && (
+                                    <div className="mt-1.5 flex items-start gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                                        <span className="material-symbols-outlined text-[14px] text-primary mt-0.5 select-none">auto_awesome</span>
+                                        <p className="text-xs text-primary/90 italic leading-snug line-clamp-2">
+                                            {track.ai_reason}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
-                            <div className="text-muted-foreground text-sm font-variant-numeric tabular-nums">
+                            <div className="text-muted-foreground text-sm font-variant-numeric tabular-nums whitespace-nowrap">
                                 {Math.floor(track.duration_ms / 60000)}:{((track.duration_ms % 60000) / 1000).toFixed(0).padStart(2, '0')}
                             </div>
                         </div>
@@ -322,8 +321,6 @@ function ResultsContent() {
                         Create Another Mix
                     </Link>
                 </div>
-
-
 
                 {/* Music Platform Modal */}
                 {showPlatformModal && (
