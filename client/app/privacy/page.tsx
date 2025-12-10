@@ -42,7 +42,8 @@ export default function PrivacyPolicy() {
                     <p className="mb-2">Our service integrates with the following third-party services:</p>
                     <ul className="list-disc list-inside ml-4 space-y-1">
                         <li><strong>Spotify:</strong> Data provided to Spotify is subject to the <a href="https://www.spotify.com/legal/privacy-policy/" target="_blank" className="text-primary hover:underline">Spotify Privacy Policy</a>.</li>
-                        <li><strong>Google (YouTube):</strong> Data provided to YouTube is subject to the <a href="https://policies.google.com/privacy" target="_blank" className="text-primary hover:underline">Google Privacy Policy</a>.</li>
+                        <li><strong>Google Privacy Policy:</strong> Data provided to YouTube is subject to the <a href="https://policies.google.com/privacy" target="_blank" className="text-primary hover:underline">Google Privacy Policy</a>.</li>
+                        <li><strong>YouTube Terms of Service:</strong> By using VibeMixer, you are agreeing to be bound by the <a href="https://www.youtube.com/t/terms" target="_blank" className="text-primary hover:underline">YouTube Terms of Service</a>.</li>
                     </ul>
                 </section>
 
