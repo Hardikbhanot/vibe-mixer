@@ -11,11 +11,13 @@ import html2canvas from "html2canvas";
 interface Track {
     id: string;
     name: string;
-    artists: { name: string }[];
-    album: {
+    artists?: { name: string }[];
+    artist?: string;
+    album?: {
         name: string;
         images: { url: string }[];
     };
+    image?: string;
     uri: string;
     duration_ms: number;
     external_urls: { spotify: string };
