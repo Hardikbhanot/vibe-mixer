@@ -97,7 +97,8 @@ export default function ProfilePage() {
                     username: data.user.username || '',
                     bio: data.user.bio || '',
                     isPublic: data.user.isPublic || false,
-                    isMatchable: data.user.isMatchable || false
+                    isMatchable: data.user.isMatchable || false,
+                    avatarUrl: data.user.avatarUrl || ''
                 });
             }
         } catch (error) {

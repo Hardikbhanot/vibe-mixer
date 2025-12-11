@@ -58,7 +58,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
                 isPublic: true,
                 isMatchable: true,
                 topArtists: true,
-                topTracks: true
+                topTracks: true,
+                avatarUrl: true
             }
         });
         res.json({ user });

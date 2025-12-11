@@ -1,5 +1,5 @@
 import express from 'express';
-import { generatePlaylistParams, analyzeImage } from '../services/groq.js';
+import { generatePlaylistParams, analyzeImage, generateVibeAnalysis } from '../services/groq.js';
 import { generateImage } from '../services/imagen.js';
 import { initSpotifyApi } from '../middleware/spotifyAuth.js';
 import { authenticateToken } from '../middleware/auth.js';
@@ -61,11 +61,11 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
                 // Return the first match if found
                 if (searchResult.body.tracks.items.length > 0) {
                     const spotifyTrack = searchResult.body.tracks.items[0];
-                    
+
                     // ✅ KEY UPDATE: Merge the AI's reason with the Spotify data
                     return {
                         ...spotifyTrack,
-                        ai_reason: suggestion.reason || "Fits the vibe perfectly." 
+                        ai_reason: suggestion.reason || "Fits the vibe perfectly."
                     };
                 }
                 return null;
@@ -177,7 +177,7 @@ router.post('/refine', authenticateToken, initSpotifyApi, async (req, res) => {
             try {
                 const query = `track:${suggestion.song} artist:${suggestion.artist}`;
                 const searchResult = await req.spotifyApi.searchTracks(query, { limit: 1 });
-                
+
                 if (searchResult.body.tracks.items.length > 0) {
                     const spotifyTrack = searchResult.body.tracks.items[0];
                     // ✅ KEY UPDATE: Merge AI Reason here too
@@ -218,6 +218,28 @@ router.post('/refine', authenticateToken, initSpotifyApi, async (req, res) => {
     } catch (error) {
         console.error('Refine error:', error);
         res.status(500).json({ error: 'Failed to refine playlist' });
+    }
+});
+
+// --- 5. Profile Vibe Analysis ---
+router.post('/profile-vibe', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { topArtists: true, topTracks: true }
+        });
+
+        if (!user || !user.topArtists) {
+            return res.status(400).json({ error: 'Not enough music data. Try listening to some tunes!' });
+        }
+
+        const analysis = await generateVibeAnalysis(user.topArtists, user.topTracks);
+        res.json(analysis);
+
+    } catch (error) {
+        console.error('Vibe Analysis Error:', error);
+        res.status(500).json({ error: 'Failed to analyze vibe' });
     }
 });
 
