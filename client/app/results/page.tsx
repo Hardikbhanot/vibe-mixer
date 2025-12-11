@@ -49,6 +49,7 @@ function ResultsContent() {
     const [showPlatformModal, setShowPlatformModal] = useState(false);
     const [selectedTrackForPlay, setSelectedTrackForPlay] = useState<Track | null>(null);
     const [imageLoaded, setImageLoaded] = useState(false);
+    const [isPublic, setIsPublic] = useState(false);
 
     useEffect(() => {
         const storedData = localStorage.getItem('playlistData');
@@ -182,7 +183,8 @@ function ResultsContent() {
                         album: t.album?.name,
                         image: t.album?.images[0]?.url,
                         duration_ms: t.duration_ms
-                    }))
+                    })),
+                    isPublic: isPublic
                 })
             });
 
@@ -374,12 +376,23 @@ function ResultsContent() {
                                 <span className="material-symbols-outlined text-xl">play_circle</span>
                                 {isSavingYoutube ? 'Creating...' : 'Save to YouTube'}
                             </button>
+                            <div className="flex items-center gap-2 bg-surface-light dark:bg-surface-dark px-3 py-2 rounded-full border border-foreground/10 h-10">
+                                <span className={`text-xs font-bold ${isPublic ? 'text-primary' : 'text-muted-foreground'}`}>
+                                    {isPublic ? 'Public' : 'Private'}
+                                </span>
+                                <button
+                                    onClick={() => setIsPublic(!isPublic)}
+                                    className={`w-10 h-5 rounded-full relative transition-colors ${isPublic ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-700'}`}
+                                >
+                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${isPublic ? 'left-[22px]' : 'left-0.5'}`} />
+                                </button>
+                            </div>
                             <button
                                 onClick={handleSaveToLibrary}
                                 className="flex items-center justify-center gap-2 h-10 px-6 bg-surface-light dark:bg-surface-dark border border-foreground/10 hover:bg-foreground/5 text-sm font-bold rounded-full transition-colors"
                             >
                                 <span className="material-symbols-outlined text-xl">bookmark</span>
-                                Save to Library
+                                Save
                             </button>
                             {/* Debug button removed */}
                             <button
