@@ -165,7 +165,6 @@ router.get('/callback', async (req, res) => {
 
         const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
         console.log('[Spotify Callback] Success via Spotify API');
-        console.log('[Spotify Callback] Redirecting to Frontend:', clientUrl);
 
         // Fetch User Profile from Spotify to link/create account
         spotifyApi.setAccessToken(access_token);
@@ -179,17 +178,54 @@ router.get('/callback', async (req, res) => {
             throw new Error('Spotify did not return an email address');
         }
 
-        // Find or Create User
+        // --- Fetch Vibe Data (Top Artists/Tracks) ---
+        let topArtistsData = [];
+        let topTracksData = [];
+
+        try {
+            const topArtists = await spotifyApi.getMyTopArtists({ limit: 20, time_range: 'medium_term' });
+            topArtistsData = topArtists.body.items.map(artist => ({
+                id: artist.id,
+                name: artist.name,
+                image: artist.images[0]?.url,
+                genres: artist.genres
+            }));
+
+            const topTracks = await spotifyApi.getMyTopTracks({ limit: 20, time_range: 'medium_term' });
+            topTracksData = topTracks.body.items.map(track => ({
+                id: track.id,
+                name: track.name,
+                artist: track.artists[0].name,
+                album: track.album.name,
+                image: track.album.images[0]?.url
+            }));
+            console.log(`[Spotify Auth] Fetched ${topArtistsData.length} artists and ${topTracksData.length} tracks.`);
+        } catch (dataErr) {
+            console.error('[Spotify Auth] Failed to fetch top data:', dataErr);
+            // Non-blocking, continue login
+        }
+
+        // Find or Create User & Update Vibe Data
         let user = await prisma.user.findUnique({ where: { email: spotifyEmail } });
 
         if (!user) {
-            // Create new user with placeholder password
             console.log('[Spotify Auth] Creating new user from Spotify...');
             const placeholderPassword = await bcrypt.hash(`spotify_${spotifyId}_${Date.now()}`, 10);
             user = await prisma.user.create({
                 data: {
                     email: spotifyEmail,
-                    password_hash: placeholderPassword
+                    password_hash: placeholderPassword,
+                    topArtists: topArtistsData,
+                    topTracks: topTracksData
+                }
+            });
+        } else {
+            console.log('[Spotify Auth] Updating existing user vibe data...');
+            user = await prisma.user.update({
+                where: { email: spotifyEmail },
+                data: {
+                    topArtists: topArtistsData,
+                    topTracks: topTracksData
                 }
             });
         }
