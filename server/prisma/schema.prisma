@@ -27,9 +27,12 @@ model User {
   topArtists    Json?          // Cached list of top artists { name, image, id }
   topTracks     Json?          // Cached list of top tracks { name, artist, image, id }
 
+
   // Relations
   matchesAsA    Match[]        @relation("UserMatchesA")
   matchesAsB    Match[]        @relation("UserMatchesB")
+  likes         Like[]
+  awards        Award[]
 }
 
 model Match {
@@ -79,6 +82,35 @@ model Playlist {
   user        User     @relation(fields: [userId], references: [id])
   
   createdAt   DateTime @default(now())
+
+  // Engagement stats
+  saveCount   Int      @default(0)
+  plays       Int      @default(0)
+  likes       Like[]
+}
+
+model Like {
+  id         String   @id @default(uuid())
+  userId     String
+  playlistId String
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id])
+  playlist   Playlist @relation(fields: [playlistId], references: [id])
+
+  @@unique([userId, playlistId])
+}
+
+model Award {
+  id          String   @id @default(uuid())
+  userId      String
+  type        String   // FIRST_LIKE, POPULAR_CREATOR, etc.
+  name        String
+  description String
+  icon        String   // Material Icon name
+  awardedAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
 }
 
 enum Action {
