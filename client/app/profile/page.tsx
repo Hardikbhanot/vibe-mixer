@@ -22,6 +22,7 @@ interface SavedPlaylist {
     description: string;
     coverImage: string;
     createdAt: string;
+    isPublic: boolean;
     tracks: any[];
 }
 
@@ -34,6 +35,8 @@ export default function ProfilePage() {
     const [playlists, setPlaylists] = useState<SavedPlaylist[]>([]);
     const [activeTab, setActiveTab] = useState<'playlists' | 'history' | 'settings'>('playlists');
     const [isLoading, setIsLoading] = useState(true);
+    const [editingPlaylist, setEditingPlaylist] = useState<SavedPlaylist | null>(null);
+    const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
     // Profile Settings State
     const [profileData, setProfileData] = useState({
@@ -229,6 +232,60 @@ export default function ProfilePage() {
         }
     };
 
+    const updatePlaylist = async (updated: SavedPlaylist) => {
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+            const res = await fetch(`${apiUrl}/api/playlists/${updated.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: updated.name,
+                    description: updated.description,
+                    isPublic: updated.isPublic,
+                    coverImage: updated.coverImage
+                }),
+                credentials: 'include'
+            });
+
+            if (res.ok) {
+                setPlaylists(prev => prev.map(p => p.id === updated.id ? updated : p));
+                toast.success("Mix updated successfully!");
+                setEditingPlaylist(null);
+            } else {
+                toast.error("Failed to update mix");
+            }
+        } catch (error) {
+            toast.error("Network error");
+        }
+    };
+
+    const generateCover = async (playlist: SavedPlaylist) => {
+        setIsGeneratingImage(true);
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+            const prompt = `A cover art for a music playlist named "${playlist.name}". Mood: ${playlist.description || 'Cool vibes'}. Artistic, high quality.`;
+
+            const res = await fetch(`${apiUrl}/api/ai/image`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt }),
+                credentials: 'include'
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                const updated = { ...playlist, coverImage: data.imageUrl };
+                setEditingPlaylist(updated); // Update the modal preview immediately
+            } else {
+                toast.error("Failed to generate art");
+            }
+        } catch (error) {
+            toast.error("Image gen failed");
+        } finally {
+            setIsGeneratingImage(false);
+        }
+    };
+
     const loadPlaylist = (playlist: SavedPlaylist) => {
         const totalDuration = Math.round(playlist.tracks.reduce((acc: number, t: any) => acc + t.duration_ms, 0) / 60000);
 
@@ -257,10 +314,25 @@ export default function ProfilePage() {
 
                 {/* --- Profile Header --- */}
                 <div className="flex flex-col items-center gap-4 py-8">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-primary to-secondary p-[3px]">
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-primary to-secondary p-[3px] relative group cursor-pointer">
                         <div className="w-full h-full rounded-full bg-surface-light dark:bg-surface-dark flex items-center justify-center overflow-hidden">
-                            <span className="text-4xl font-bold uppercase select-none">{user?.email[0]}</span>
+                            {profileData.avatarUrl ? (
+                                <img src={profileData.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="text-4xl font-bold uppercase select-none">{user?.email[0]}</span>
+                            )}
                         </div>
+                        {/* Overlay for upload */}
+                        <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="material-symbols-outlined text-white">photo_camera</span>
+                        </div>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            title="Change Profile Photo"
+                        />
                     </div>
                     <div className="text-center">
                         <h2 className="text-2xl font-bold">{user?.email}</h2>
@@ -364,13 +436,108 @@ export default function ProfilePage() {
                                         <button
                                             onClick={(e) => deletePlaylist(e, playlist.id)}
                                             className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center bg-black/50 hover:bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all z-10"
+                                            title="Delete Mix"
                                         >
                                             <span className="material-symbols-outlined text-base">delete</span>
+                                        </button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setEditingPlaylist(playlist); }}
+                                            className="absolute top-2 right-12 w-8 h-8 flex items-center justify-center bg-black/50 hover:bg-primary rounded-full text-white transition-all z-10"
+                                            title="Edit Mix"
+                                        >
+                                            <span className="material-symbols-outlined text-base">edit</span>
                                         </button>
                                     </div>
                                 ))}
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* --- Edit Modal --- */}
+                {editingPlaylist && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                        <div className="bg-surface-light dark:bg-surface-dark w-full max-w-md rounded-2xl shadow-xl border border-foreground/10 overflow-hidden flex flex-col max-h-[90vh]">
+                            <div className="p-4 border-b border-foreground/5 flex justify-between items-center bg-background-light dark:bg-background-dark">
+                                <h3 className="font-bold text-lg">Edit Mix</h3>
+                                <button onClick={() => setEditingPlaylist(null)} className="text-muted-foreground hover:text-foreground">
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
+
+                            <div className="p-6 space-y-4 overflow-y-auto">
+                                {/* Cover Image Preview & Gen */}
+                                <div className="flex flex-col items-center gap-3">
+                                    <div className="w-40 h-40 rounded-xl overflow-hidden bg-black/5 relative group border border-foreground/10">
+                                        <img src={editingPlaylist.coverImage || '/placeholder.png'} alt="Cover" className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <span className="text-white text-xs font-bold">Preview</span>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => generateCover(editingPlaylist)}
+                                        disabled={isGeneratingImage}
+                                        className="text-xs bg-secondary/10 text-secondary hover:bg-secondary/20 px-4 py-2 rounded-full font-bold transition-colors flex items-center gap-2"
+                                    >
+                                        <span className={`material-symbols-outlined text-base ${isGeneratingImage ? 'animate-spin' : ''}`}>
+                                            {isGeneratingImage ? 'refresh' : 'auto_awesome'}
+                                        </span>
+                                        {isGeneratingImage ? 'Designing...' : 'Generate New Art'}
+                                    </button>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Title</label>
+                                        <input
+                                            value={editingPlaylist.name}
+                                            onChange={(e) => setEditingPlaylist({ ...editingPlaylist, name: e.target.value })}
+                                            className="w-full bg-background-light dark:bg-background-dark border border-foreground/10 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-primary/50 font-bold"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Description</label>
+                                        <textarea
+                                            value={editingPlaylist.description || ''}
+                                            onChange={(e) => setEditingPlaylist({ ...editingPlaylist, description: e.target.value })}
+                                            rows={2}
+                                            className="w-full bg-background-light dark:bg-background-dark border border-foreground/10 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-3 bg-background-light dark:bg-background-dark rounded-xl border border-foreground/5">
+                                        <div>
+                                            <div className="font-bold text-sm">Make Public</div>
+                                            <div className="text-xs text-muted-foreground">Show in community discovery</div>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={editingPlaylist.isPublic || false}
+                                                onChange={(e) => setEditingPlaylist({ ...editingPlaylist, isPublic: e.target.checked })}
+                                                className="sr-only peer"
+                                            />
+                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none dark:bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-4 border-t border-foreground/5 bg-background-light dark:bg-background-dark flex gap-3">
+                                <button
+                                    onClick={() => setEditingPlaylist(null)}
+                                    className="flex-1 py-3 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => updatePlaylist(editingPlaylist)}
+                                    className="flex-1 py-3 text-sm font-bold bg-primary text-white rounded-xl shadow-lg hover:brightness-110 transition-all"
+                                >
+                                    Save Changes
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
 

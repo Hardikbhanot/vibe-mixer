@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 // 1. Save a Playlist to History
 router.post('/', authenticateToken, async (req, res) => {
     try {
-        const { name, description, coverImage, mood, tracks } = req.body;
+        const { name, description, coverImage, mood, tracks, isPublic } = req.body;
         const userId = req.user.userId; // Extracted from JWT
         console.log(`[Playlist] Saving for user ${userId}: ${name}`);
 
@@ -39,6 +39,7 @@ router.post('/', authenticateToken, async (req, res) => {
                 coverImage,
                 mood,
                 tracks: tracks || [], // Ensure tracks is at least an empty array
+                isPublic: isPublic || false, // Default to private if not specified
                 userId
             }
         });
@@ -89,6 +90,62 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Delete playlist error:', error);
         res.status(500).json({ error: 'Failed to delete' });
+    }
+});
+
+// 4. Update a Playlist
+router.put('/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.userId;
+        const { name, description, isPublic, coverImage } = req.body;
+
+        // Ensure user owns the playlist
+        const playlist = await prisma.playlist.findUnique({
+            where: { id }
+        });
+
+        if (!playlist || playlist.userId !== userId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        const updatedPlaylist = await prisma.playlist.update({
+            where: { id },
+            data: {
+                name,
+                description,
+                isPublic,
+                coverImage
+            }
+        });
+
+        res.json({ message: 'Playlist updated', playlist: updatedPlaylist });
+    } catch (error) {
+        console.error('Update playlist error:', error);
+        res.status(500).json({ error: 'Failed to update playlist' });
+    }
+});
+
+// 5. Get Public Playlists (Discovery)
+router.get('/public', async (req, res) => {
+    try {
+        const playlists = await prisma.playlist.findMany({
+            where: { isPublic: true },
+            include: {
+                user: {
+                    select: {
+                        username: true,
+                        avatarUrl: true
+                    }
+                }
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 50
+        });
+        res.json({ playlists });
+    } catch (error) {
+        console.error('Fetch public playlists error:', error);
+        res.status(500).json({ error: 'Failed to fetch discovery feed' });
     }
 });
 
