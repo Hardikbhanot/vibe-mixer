@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '@/context/AuthContext';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 export const Header = () => {
     const { user, loading } = useAuth();
-    const pathname = usePathname();
+    const router = useRouter();
 
     const isAuthPage = pathname === '/auth';
 
@@ -17,12 +17,12 @@ export const Header = () => {
             {pathname === '/' ? (
                 <div className="size-10"></div> // Spacer
             ) : (
-                <Link
-                    href={pathname === '/swipe' ? '/results' : pathname === '/generate' ? '/' : '/generate'}
+                <button
+                    onClick={() => router.back()}
                     className="text-foreground flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                 >
                     <span className="material-symbols-outlined text-2xl">arrow_back</span>
-                </Link>
+                </button>
             )}
 
             {/* Center: Branding */}
