@@ -40,6 +40,7 @@ export default function PublicMixPage() {
     const [playlist, setPlaylist] = useState<PublicPlaylist | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         if (params.id) {
@@ -72,6 +73,45 @@ export default function PublicMixPage() {
         // Simple open in Spotify for now
         const url = track.external_urls?.spotify || `https://open.spotify.com/track/${track.id}`;
         window.open(url, '_blank');
+    };
+
+    const handleSaveToSpotify = async () => {
+        if (!playlist) return;
+        setIsSaving(true);
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+
+            const response = await fetch(`${apiUrl}/spotify/playlist`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: playlist.name,
+                    trackUris: playlist.tracks.map(t => t.uri),
+                    coverImageUrl: playlist.coverImage
+                }),
+                credentials: 'include'
+            });
+
+            if (response.status === 401) {
+                toast.error("Please login/connect Spotify first");
+                window.location.href = '/auth/login'; // Redirect to login if unauthorized
+                return;
+            }
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to create playlist');
+            }
+
+            const result = await response.json();
+            toast.success('Saved to Spotify!');
+            window.open(result.external_urls.spotify, '_blank');
+        } catch (error: any) {
+            console.error('Error saving playlist:', error);
+            toast.error(error.message || 'Failed to save to Spotify');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     if (loading) {
@@ -156,6 +196,14 @@ export default function PublicMixPage() {
                             <span className="text-sm text-muted-foreground">
                                 {new Date(playlist.createdAt).toLocaleDateString()}
                             </span>
+                            <button
+                                onClick={handleSaveToSpotify}
+                                disabled={isSaving}
+                                className="flex items-center gap-2 px-4 py-1.5 bg-[#1DB954] text-white rounded-full text-sm font-bold hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed ml-auto md:ml-0"
+                            >
+                                <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_White.png" alt="Spotify" className="h-4 w-auto" />
+                                {isSaving ? 'Saving...' : 'Save to Spotify'}
+                            </button>
                         </div>
 
                         <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
