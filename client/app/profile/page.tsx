@@ -40,7 +40,8 @@ export default function ProfilePage() {
         username: '',
         bio: '',
         isPublic: false,
-        isMatchable: false
+        isMatchable: false,
+        avatarUrl: ''
     });
 
     // --- Auth Check ---
@@ -102,6 +103,50 @@ export default function ProfilePage() {
         } catch (error) {
             console.error('Failed to load profile settings', error);
         }
+    };
+
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit check (pre-compression)
+            toast.error("Image too large (max 5MB)");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const MAX_SIZE = 300;
+
+                if (width > height) {
+                    if (width > MAX_SIZE) {
+                        height *= MAX_SIZE / width;
+                        width = MAX_SIZE;
+                    }
+                } else {
+                    if (height > MAX_SIZE) {
+                        width *= MAX_SIZE / height;
+                        height = MAX_SIZE;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+
+                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                setProfileData(prev => ({ ...prev, avatarUrl: compressedBase64 }));
+                toast.success("Photo updated!");
+            };
+            img.src = event.target?.result as string;
+        };
+        reader.readAsDataURL(file);
     };
 
     const saveProfile = async () => {
