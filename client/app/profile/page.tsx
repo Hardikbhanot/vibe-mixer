@@ -147,7 +147,7 @@ export default function ProfilePage() {
         if (!confirm("Delete this mix forever?")) return;
 
         try {
-            const apiUrl = '';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
             await fetch(`${apiUrl}/api/playlists/${id}`, {
                 method: 'DELETE',
                 credentials: 'include'
@@ -355,9 +355,91 @@ export default function ProfilePage() {
                             </div>
                         )}
                     </div>
-                )}
+                    </div>
+    )
+}
 
-            </main>
+{/* --- Tab Content: SETTINGS --- */ }
+{
+    activeTab === 'settings' && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-lg mx-auto bg-surface-light dark:bg-surface-dark p-6 rounded-2xl shadow-sm border border-foreground/5 mb-10">
+            <h3 className="text-xl font-bold mb-6">Profile Settings</h3>
+
+            <div className="space-y-6">
+                {/* Username */}
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">Username (Unique)</label>
+                    <div className="flex gap-2 items-center">
+                        <span className="text-muted-foreground">@</span>
+                        <input
+                            type="text"
+                            value={profileData.username}
+                            onChange={(e) => setProfileData({ ...profileData, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
+                            placeholder="your_handle"
+                            className="flex-1 bg-background-light dark:bg-background-dark border border-foreground/10 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary outline-none"
+                        />
+                    </div>
+                </div>
+
+                {/* Bio */}
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">Bio</label>
+                    <textarea
+                        value={profileData.bio}
+                        onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
+                        placeholder="Tell the world about your vibe..."
+                        rows={3}
+                        className="w-full bg-background-light dark:bg-background-dark border border-foreground/10 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary outline-none resize-none"
+                    />
+                </div>
+
+                {/* Toggles */}
+                <div className="space-y-4 pt-4 border-t border-foreground/10">
+                    <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                            <span className="font-bold">Public Profile</span>
+                            <span className="text-xs text-muted-foreground">Allow others to see your mixes and vibe at /u/{profileData.username || 'username'}</span>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={profileData.isPublic}
+                                onChange={(e) => setProfileData({ ...profileData, isPublic: e.target.checked })}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none dark:bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                            <span className="font-bold">Vibe Match</span>
+                            <span className="text-xs text-muted-foreground">Allow others to match with you based on music taste.</span>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={profileData.isMatchable}
+                                onChange={(e) => setProfileData({ ...profileData, isMatchable: e.target.checked })}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none dark:bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <button
+                    onClick={saveProfile}
+                    className="w-full py-3 bg-primary text-white font-bold rounded-xl shadow-lg hover:brightness-110 transition-all mt-4"
+                >
+                    Save Changes
+                </button>
+            </div>
         </div>
+    )
+}
+
+            </main >
+        </div >
     );
 }
