@@ -41,6 +41,8 @@ export default function PublicMixPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [liked, setLiked] = useState(false);
+    const [likeCount, setLikeCount] = useState(0);
 
     useEffect(() => {
         if (params.id) {
@@ -61,6 +63,18 @@ export default function PublicMixPage() {
 
             const data = await res.json();
             setPlaylist(data);
+            setLikeCount(data.likeCount || 0);
+
+            // Check if liked
+            try {
+                const likeRes = await fetch(`${apiUrl}/api/playlists/${id}/is-liked`, { credentials: 'include' });
+                if (likeRes.ok) {
+                    const likeData = await likeRes.json();
+                    setLiked(likeData.liked);
+                }
+            } catch (e) {
+                console.log('Not logged in or error checking like');
+            }
         } catch (err: any) {
             console.error(err);
             setError(err.message || 'Error loading vibe');
@@ -193,13 +207,29 @@ export default function PublicMixPage() {
                             <span className="text-sm bg-primary/10 text-primary px-3 py-1 rounded-full font-medium">
                                 {playlist.mood || 'Mix'}
                             </span>
-                            <span className="text-sm text-muted-foreground">
+                            <span className="text-sm text-muted-foreground mr-auto">
                                 {new Date(playlist.createdAt).toLocaleDateString()}
                             </span>
+
+                            {/* Like Button */}
+                            <button
+                                onClick={toggleLike}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold transition-all ${liked ? 'bg-red-500/10 text-red-500' : 'bg-surface-light dark:bg-surface-dark hover:bg-foreground/5 text-muted-foreground'}`}
+                            >
+                                <span className={`material-symbols-outlined text-[18px] ${liked ? 'fill-current' : ''}`}>favorite</span>
+                                {likeCount}
+                            </button>
+
+                            {/* Save Count Display */}
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-light dark:bg-surface-dark text-muted-foreground text-sm font-bold">
+                                <span className="material-symbols-outlined text-[18px]">bookmark</span>
+                                {(playlist as any).saveCount || 0}
+                            </div>
+
                             <button
                                 onClick={handleSaveToSpotify}
                                 disabled={isSaving}
-                                className="flex items-center gap-2 px-4 py-1.5 bg-[#1DB954] text-white rounded-full text-sm font-bold hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed ml-auto md:ml-0"
+                                className="flex items-center gap-2 px-4 py-1.5 bg-[#1DB954] text-white rounded-full text-sm font-bold hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_White.png" alt="Spotify" className="h-4 w-auto" />
                                 {isSaving ? 'Saving...' : 'Save to Spotify'}

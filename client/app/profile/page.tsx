@@ -24,6 +24,20 @@ interface SavedPlaylist {
     createdAt: string;
     isPublic: boolean;
     tracks: any[];
+    vibeTags?: string[];
+    topArtists?: any[];
+    awards?: { id: string, name: string, description: string, icon: string, type: string }[];
+}
+
+interface ProfileDataType {
+    username: string;
+    bio: string;
+    isPublic: boolean;
+    isMatchable: boolean;
+    avatarUrl: string;
+    vibeTags?: string[];
+    topArtists?: any[];
+    awards?: { id: string, name: string, description: string, icon: string, type: string }[];
 }
 
 export default function ProfilePage() {
@@ -39,12 +53,15 @@ export default function ProfilePage() {
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
     // Profile Settings State
-    const [profileData, setProfileData] = useState({
+    const [profileData, setProfileData] = useState<ProfileDataType>({
         username: '',
         bio: '',
         isPublic: false,
         isMatchable: false,
-        avatarUrl: ''
+        avatarUrl: '',
+        vibeTags: [],
+        topArtists: [],
+        awards: []
     });
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -125,7 +142,10 @@ export default function ProfilePage() {
                     bio: data.user.bio || '',
                     isPublic: data.user.isPublic || false,
                     isMatchable: data.user.isMatchable || false,
-                    avatarUrl: data.user.avatarUrl || ''
+                    avatarUrl: data.user.avatarUrl || '',
+                    vibeTags: data.user.vibeTags || [],
+                    topArtists: data.user.topArtists || [],
+                    awards: data.user.awards || []
                 });
             }
         } catch (error) {
@@ -614,6 +634,34 @@ export default function ProfilePage() {
                                     />
                                 </div>
                             </div>
+                            {/* Vibe Tags */}
+                            {profileData.vibeTags && profileData.vibeTags.length > 0 && (
+                                <div className="flex flex-wrap gap-2 justify-center mb-6">
+                                    {profileData.vibeTags.map((tag: string, i: number) => (
+                                        <span key={i} className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider">
+                                            {tag}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Awards Section */}
+                            {profileData.awards && profileData.awards.length > 0 && (
+                                <div className="w-full max-w-2xl mb-8">
+                                    <h3 className="text-sm font-bold text-muted-foreground uppercase mb-3 text-center">Achievements</h3>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        {profileData.awards.map((award: any) => (
+                                            <div key={award.id} className="flex flex-col items-center p-3 rounded-xl bg-surface-light dark:bg-surface-dark border border-foreground/5 text-center">
+                                                <div className="w-10 h-10 rounded-full bg-yellow-500/10 text-yellow-500 flex items-center justify-center mb-2">
+                                                    <span className="material-symbols-outlined">{award.icon}</span>
+                                                </div>
+                                                <p className="font-bold text-xs">{award.name}</p>
+                                                <p className="text-[10px] text-muted-foreground leading-tight mt-1">{award.description}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Bio & Vibe Analysis */}
                             <div className="space-y-2">
