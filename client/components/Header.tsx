@@ -38,6 +38,9 @@ export const Header = () => {
                 <Link href="/swipe" className="hidden md:block text-sm font-medium hover:text-primary transition-colors text-center">
                     Swipe Mode
                 </Link>
+                <Link href="/discover" className="hidden md:block text-sm font-medium hover:text-primary transition-colors text-center">
+                    Discover
+                </Link>
                 <Link href="/india" className="hidden md:block text-sm font-medium hover:text-primary transition-colors text-center">
                     Indian Vibe Map
                 </Link>
