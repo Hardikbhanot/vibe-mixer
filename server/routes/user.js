@@ -68,16 +68,16 @@ router.get('/profile', authenticateToken, async (req, res) => {
     }
 });
 
-// Update Profile
+// Update User Profile
 router.put('/profile', authenticateToken, async (req, res) => {
     try {
+        const { username, bio, isPublic, isMatchable, avatarUrl } = req.body;
         const userId = req.user.userId;
-        const { username, bio, isPublic, isMatchable } = req.body;
 
-        // Validation
+        // Validation: Username uniqueness check
         if (username) {
-            const taken = await prisma.user.findUnique({ where: { username } });
-            if (taken && taken.id !== userId) {
+            const existingUser = await prisma.user.findUnique({ where: { username } });
+            if (existingUser && existingUser.id !== userId) {
                 return res.status(400).json({ error: 'Username already taken' });
             }
         }
@@ -88,9 +88,9 @@ router.put('/profile', authenticateToken, async (req, res) => {
                 username,
                 bio,
                 isPublic,
-                isMatchable
-            },
-            select: { username: true, bio: true, isPublic: true, isMatchable: true }
+                isMatchable,
+                avatarUrl // Save Base64 string
+            }
         });
 
         res.json({ message: 'Profile updated', user: updatedUser });
