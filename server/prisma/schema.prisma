@@ -22,6 +22,8 @@ model User {
   isPublic      Boolean        @default(false)
   isMatchable   Boolean        @default(false)
   bio           String?
+  avatarUrl     String?        // Base64 string for profile picture
+  vibeTags      Json?          // AI generated vibe tags
   topArtists    Json?          // Cached list of top artists { name, image, id }
   topTracks     Json?          // Cached list of top tracks { name, artist, image, id }
 
@@ -68,7 +70,8 @@ model Playlist {
   name        String
   description String?
   coverImage  String?
-  mood        String?  
+  mood        String?
+  isPublic    Boolean  @default(false) 
   
   tracks      Json     
   
