@@ -32,8 +32,16 @@ export default function ProfilePage() {
     // --- State ---
     const [history, setHistory] = useState<SwipeRecord[]>([]);
     const [playlists, setPlaylists] = useState<SavedPlaylist[]>([]);
-    const [activeTab, setActiveTab] = useState<'playlists' | 'history'>('playlists');
+    const [activeTab, setActiveTab] = useState<'playlists' | 'history' | 'settings'>('playlists');
     const [isLoading, setIsLoading] = useState(true);
+
+    // Profile Settings State
+    const [profileData, setProfileData] = useState({
+        username: '',
+        bio: '',
+        isPublic: false,
+        isMatchable: false
+    });
 
     // --- Auth Check ---
     useEffect(() => {
@@ -45,13 +53,13 @@ export default function ProfilePage() {
     // --- Data Fetching ---
     useEffect(() => {
         if (user) {
-            Promise.all([fetchSwipes(), fetchPlaylists()]).finally(() => setIsLoading(false));
+            Promise.all([fetchSwipes(), fetchPlaylists(), fetchProfile()]).finally(() => setIsLoading(false));
         }
     }, [user]);
 
     const fetchSwipes = async () => {
         try {
-            const apiUrl = '';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
             const res = await fetch(`${apiUrl}/api/user/history`, { credentials: 'include' });
             if (res.ok) {
                 const data = await res.json();
@@ -64,7 +72,7 @@ export default function ProfilePage() {
 
     const fetchPlaylists = async () => {
         try {
-            const apiUrl = '';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
 
             const res = await fetch(`${apiUrl}/api/playlists`, {
                 credentials: 'include'
@@ -78,10 +86,49 @@ export default function ProfilePage() {
         }
     };
 
+    const fetchProfile = async () => {
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+            const res = await fetch(`${apiUrl}/api/user/profile`, { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                setProfileData({
+                    username: data.user.username || '',
+                    bio: data.user.bio || '',
+                    isPublic: data.user.isPublic || false,
+                    isMatchable: data.user.isMatchable || false
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load profile settings', error);
+        }
+    };
+
+    const saveProfile = async () => {
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+            const res = await fetch(`${apiUrl}/api/user/profile`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(profileData),
+                credentials: 'include'
+            });
+
+            if (res.ok) {
+                toast.success("Profile updated successfully!");
+            } else {
+                const data = await res.json();
+                toast.error(data.error || "Failed to update profile");
+            }
+        } catch (error) {
+            toast.error("Network error");
+        }
+    };
+
     // --- Actions ---
     const deleteSwipe = async (id: string) => {
         try {
-            const apiUrl = '';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
             const res = await fetch(`${apiUrl}/api/user/history/${id}`, {
                 method: 'DELETE',
                 credentials: 'include'
@@ -176,8 +223,8 @@ export default function ProfilePage() {
                     <button
                         onClick={() => setActiveTab('playlists')}
                         className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'playlists'
-                                ? 'bg-background-light dark:bg-background-dark shadow-sm text-primary'
-                                : 'text-muted-foreground hover:text-foreground'
+                            ? 'bg-background-light dark:bg-background-dark shadow-sm text-primary'
+                            : 'text-muted-foreground hover:text-foreground'
                             }`}
                     >
                         My Mixes
@@ -185,11 +232,20 @@ export default function ProfilePage() {
                     <button
                         onClick={() => setActiveTab('history')}
                         className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'history'
-                                ? 'bg-background-light dark:bg-background-dark shadow-sm text-primary'
-                                : 'text-muted-foreground hover:text-foreground'
+                            ? 'bg-background-light dark:bg-background-dark shadow-sm text-primary'
+                            : 'text-muted-foreground hover:text-foreground'
                             }`}
                     >
                         Swipe History
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('settings')}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'settings'
+                            ? 'bg-background-light dark:bg-background-dark shadow-sm text-primary'
+                            : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                    >
+                        Settings
                     </button>
                 </div>
 
@@ -281,8 +337,8 @@ export default function ProfilePage() {
                                         </div>
                                         <div className="flex items-center gap-3 shrink-0">
                                             <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${item.action === 'LIKE' ? 'bg-green-500/10 text-green-500' :
-                                                    item.action === 'SUPERLIKE' ? 'bg-blue-500/10 text-blue-500' :
-                                                        'bg-red-500/10 text-red-500'
+                                                item.action === 'SUPERLIKE' ? 'bg-blue-500/10 text-blue-500' :
+                                                    'bg-red-500/10 text-red-500'
                                                 }`}>
                                                 {item.action}
                                             </span>
