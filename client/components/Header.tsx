@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 
 export const Header = () => {
     const { user, loading } = useAuth();
+    const pathname = usePathname();
     const router = useRouter();
 
     const isAuthPage = pathname === '/auth';
