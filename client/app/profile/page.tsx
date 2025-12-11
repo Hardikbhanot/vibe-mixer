@@ -43,6 +43,30 @@ export default function ProfilePage() {
         isMatchable: false,
         avatarUrl: ''
     });
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+    const analyzeVibe = async () => {
+        setIsAnalyzing(true);
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+            const res = await fetch(`${apiUrl}/ai/profile-vibe`, {
+                method: 'POST',
+                credentials: 'include'
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                setProfileData(prev => ({ ...prev, bio: data.bio }));
+                toast.success("Vibe checked! 🎵");
+            } else {
+                toast.error(data.error || "Could not analyze vibe");
+            }
+        } catch (error) {
+            toast.error("AI is sleepy. Try again later.");
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
 
     // --- Auth Check ---
     useEffect(() => {
@@ -424,9 +448,23 @@ export default function ProfilePage() {
                                 </div>
                             </div>
 
-                            {/* Bio */}
+                            {/* Bio & Vibe Analysis */}
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-muted-foreground">Bio</label>
+                                <div className="flex justify-between items-center">
+                                    <label className="text-sm font-medium text-muted-foreground">Bio</label>
+                                    <button
+                                        onClick={analyzeVibe}
+                                        disabled={isAnalyzing}
+                                        className="text-xs flex items-center gap-1 text-primary hover:bg-primary/10 px-2 py-1 rounded-md transition-colors disabled:opacity-50"
+                                    >
+                                        {isAnalyzing ? (
+                                            <span className="animate-spin material-symbols-outlined text-[14px]">refresh</span>
+                                        ) : (
+                                            <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+                                        )}
+                                        {isAnalyzing ? 'Vibin...' : 'AI Vibe Check'}
+                                    </button>
+                                </div>
                                 <textarea
                                     value={profileData.bio}
                                     onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
@@ -434,6 +472,9 @@ export default function ProfilePage() {
                                     rows={3}
                                     className="w-full bg-background-light dark:bg-background-dark border border-foreground/10 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary outline-none resize-none"
                                 />
+                                <p className="text-[10px] text-muted-foreground">
+                                    Click "AI Vibe Check" to generate a bio based on your top artists.
+                                </p>
                             </div>
 
                             {/* Toggles */}
