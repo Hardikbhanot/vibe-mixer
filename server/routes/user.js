@@ -100,6 +100,30 @@ router.put('/profile', authenticateToken, async (req, res) => {
     }
 });
 
+// Get Discovery Feed (Public Users)
+router.get('/discover', async (req, res) => {
+    try {
+        const users = await prisma.user.findMany({
+            where: { isPublic: true },
+            select: {
+                id: true,
+                username: true,
+                bio: true,
+                topArtists: true,
+                _count: {
+                    select: { playlists: true }
+                }
+            },
+            take: 50,
+            orderBy: { created_at: 'desc' } // Showing newest members first
+        });
+        res.json({ users });
+    } catch (error) {
+        console.error('Fetch discovery error:', error);
+        res.status(500).json({ error: 'Failed to fetch community' });
+    }
+});
+
 // Get Public Profile by Username
 router.get('/public/:username', async (req, res) => {
     try {
