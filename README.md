@@ -38,9 +38,13 @@ VibeMixer automates this by:
 ## ✨ Key Features
 
 * **🤖 AI-Driven Curation:** Understands complex, natural language prompts (e.g., "Songs for driving through Tokyo at night").
+* **🌍 Discover Feed:** Browse a community feed of public mixes curated by other users, tailored with custom AI cover art.
 * **📍 Indian Vibe Map:** Interactive map to discover trending music across different Indian states instantly.
 * **🔥 Swipe Mode:** Tinder-style "Like or Nope" interface to refine your music taste and train the recommendation engine.
 * **🎵 Dual-Platform Sync:** Generates playlists on **Spotify** and **YouTube** from a single prompt.
+* **💾 Community Save:** Save any public mix directly to ... your Spotify library with one click.
+* **👤 Creator Profiles:** Visit user profiles to see their public mix history and AI-generated bios.
+* **📱 Mobile Optimized:** Fully responsive design with a mobile-first hamburger menu for easy navigation.
 * **⚡ Optimized Performance:** Uses parallel `Promise.all` execution for API searches, reducing generation time to <5 seconds.
 * **🖼️ Dynamic Cover Art:** Automatically generates visual cover art that matches the acoustic "vibe" of the playlist.
 * **🔐 Secure Authentication:** Implements Authorization Code Flow and Guest Mode for flexible access.
