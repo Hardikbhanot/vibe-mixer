@@ -16,6 +16,39 @@ model User {
   
   swipes        SwipeHistory[]
   playlists     Playlist[]    
+
+  // Social Profile Fields
+  username      String?        @unique
+  isPublic      Boolean        @default(false)
+  isMatchable   Boolean        @default(false)
+  bio           String?
+  topArtists    Json?          // Cached list of top artists { name, image, id }
+  topTracks     Json?          // Cached list of top tracks { name, artist, image, id }
+
+  // Relations
+  matchesAsA    Match[]        @relation("UserMatchesA")
+  matchesAsB    Match[]        @relation("UserMatchesB")
+}
+
+model Match {
+  id        String   @id @default(uuid())
+  userAId   String
+  userBId   String
+  score     Float    // Compatibility score (0-100)
+  status    MatchStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  userA     User     @relation("UserMatchesA", fields: [userAId], references: [id])
+  userB     User     @relation("UserMatchesB", fields: [userBId], references: [id])
+
+  @@unique([userAId, userBId]) // Prevent duplicate match pairs
+}
+
+enum MatchStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
 }
 
 model SwipeHistory {
