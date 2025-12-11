@@ -59,7 +59,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
                 isMatchable: true,
                 topArtists: true,
                 topTracks: true,
-                avatarUrl: true
+                avatarUrl: true,
+                awards: true // Include awards
             }
         });
         res.json({ user });
