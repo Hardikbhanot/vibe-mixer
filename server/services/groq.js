@@ -163,3 +163,47 @@ export const analyzeImage = async (base64Image, mimeType = 'image/jpeg') => {
         throw error;
     }
 };
+
+export const generateVibeAnalysis = async (topArtists, topTracks) => {
+    console.log('[Groq] Generating Vibe Analysis...');
+
+    // Format data for prompt
+    const artistsList = topArtists ? topArtists.map(a => a.name).join(', ') : 'Unknown';
+    const tracksList = topTracks ? topTracks.map(t => `${t.name} by ${t.artist}`).join(', ') : 'Unknown';
+
+    const prompt = `
+    Analyze the musical taste of a user based on their top artists and tracks.
+    
+    Top Artists: ${artistsList}
+    Top Tracks: ${tracksList}
+
+    1. Write a creative, cool, and short Bio (max 2 sentences) that describes their "Vibe". Use emojis.
+    2. Generate 3-5 short "Vibe Tags" (e.g., "Indie Chill", "Techno Bunker", "Sad Boi Hours").
+
+    Output MUST be valid JSON:
+    {
+      "bio": "The generated bio string...",
+      "tags": ["Tag1", "Tag2", "Tag3"]
+    }
+    `;
+
+    try {
+        const completion = await groq.chat.completions.create({
+            messages: [
+                { role: "system", content: "You are a cool music trend analyzer. You speak in a modern, Gen-Z friendly tone. Output JSON only." },
+                { role: "user", content: prompt },
+            ],
+            model: "llama-3.3-70b-versatile",
+            response_format: { type: "json_object" },
+            temperature: 0.8,
+        });
+
+        const content = completion.choices[0]?.message?.content;
+        console.log('[Groq] Vibe Analysis:', content);
+        return JSON.parse(content);
+    } catch (error) {
+        console.error("Groq Vibe Analysis Error:", error);
+        // Fallback
+        return { bio: "Music lover with a mysterious vibe. 🎵", tags: ["Eclectic"] };
+    }
+};
