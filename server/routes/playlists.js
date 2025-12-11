@@ -147,6 +147,35 @@ router.get('/public', async (req, res) => {
         console.error('Fetch public playlists error:', error);
         res.status(500).json({ error: 'Failed to fetch discovery feed' });
     }
-});
+    // 5a. Get Single Public Playlist
+    router.get('/public/:id', async (req, res) => {
+        try {
+            const { id } = req.params;
+            const playlist = await prisma.playlist.findUnique({
+                where: { id },
+                include: {
+                    user: {
+                        select: {
+                            username: true,
+                            avatarUrl: true
+                        }
+                    }
+                }
+            });
 
-export default router;
+            if (!playlist) {
+                return res.status(404).json({ error: 'Playlist not found' });
+            }
+
+            if (!playlist.isPublic) {
+                return res.status(403).json({ error: 'This playlist is private' });
+            }
+
+            res.json(playlist);
+        } catch (error) {
+            console.error('Fetch public playlist error:', error);
+            res.status(500).json({ error: 'Failed to fetch playlist' });
+        }
+    });
+
+    export default router;
