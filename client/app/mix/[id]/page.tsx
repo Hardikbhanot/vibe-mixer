@@ -83,6 +83,26 @@ export default function PublicMixPage() {
         }
     };
 
+    const toggleLike = async () => {
+        if (!playlist) return;
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+        try {
+            const res = await fetch(`${apiUrl}/api/playlists/${playlist.id}/like`, {
+                method: 'POST',
+                credentials: 'include'
+            });
+            if (res.status === 401) {
+                toast.error("Login to like mixes!");
+                return;
+            }
+            const data = await res.json();
+            setLiked(data.liked);
+            setLikeCount(data.count);
+        } catch (error) {
+            console.error('Like toggle error', error);
+        }
+    };
+
     const handlePlayTrack = (track: Track) => {
         // Simple open in Spotify for now
         const url = track.external_urls?.spotify || `https://open.spotify.com/track/${track.id}`;
