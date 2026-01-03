@@ -71,23 +71,37 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
         }
 
 
-        // --- DATA FRESHNESS: Fetch New Releases from Spotify ---
+
+        // --- DATA FRESHNESS: Targeted RAG (Search for RELEVANT new music) ---
         let newReleasesContext = "";
         try {
-            const newReleases = await req.spotifyApi.getNewReleases({ limit: 10, country: 'US' });
-            if (newReleases.body.albums.items.length > 0) {
-                const freshTracks = newReleases.body.albums.items.map(album =>
-                    `"${album.name}" by ${album.artists[0].name}`
+            // "Realistic" Search: Look for the specific Vibe in the current year
+            // This finds "Sad indie songs 2026" instead of just "Any new song"
+            const currentYear = new Date().getFullYear();
+            const searchYear = `${currentYear - 1}-${currentYear}`; // e.g., "2025-2026"
+
+            // Clean mood string for search (remove generic words if needed, but strict is fine)
+            const query = `${mood} year:${searchYear}`;
+            console.log(`[AI] Searching Spotify for fresh context: "${query}"`);
+
+            const freshSearch = await req.spotifyApi.searchTracks(query, { limit: 10 });
+
+            if (freshSearch.body.tracks.items.length > 0) {
+                const freshTracks = freshSearch.body.tracks.items.map(t =>
+                    `"${t.name}" by ${t.artists[0].name} (Released: ${t.album.release_date})`
                 ).join(', ');
-                newReleasesContext = `\nJUST RELEASED (Consider these if they fit the vibe): ${freshTracks}`;
-                console.log('[AI] Injected recent releases into context');
+
+                newReleasesContext = `\nRELEVANT FRESH RELEASES (Prioritize these if they fit): ${freshTracks}`;
+                console.log('[AI] Injected vibe-specific fresh tracks');
+            } else {
+                console.log('[AI] No fresh tracks found for this specific vibe.');
             }
         } catch (freshErr) {
-            console.warn('[AI] Failed to fetch new releases:', freshErr.message);
+            console.warn('[AI] Failed to fetch fresh context:', freshErr.message);
         }
 
         // 1. Generate parameters using Groq (Now returns 'reason' in suggestions)
-        // Combine userContext and newReleasesContext
+        // Combine contexts
         const combinedContext = (userContext + newReleasesContext).trim();
         const aiParams = await generatePlaylistParams(mood, vibeType, targetTrackCount, { energy, tempo, valence }, combinedContext);
         console.log('AI Params Generated');
