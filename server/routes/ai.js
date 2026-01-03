@@ -5,6 +5,7 @@ import { initSpotifyApi } from '../middleware/spotifyAuth.js';
 import { authenticateToken } from '../middleware/auth.js';
 import multer from 'multer';
 import { PrismaClient } from '@prisma/client';
+import jwt from 'jsonwebtoken';
 
 const prisma = new PrismaClient();
 
@@ -47,8 +48,30 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
 
         console.log(`Targeting ~${targetTrackCount} tracks for ${duration} mins`);
 
+        // --- PERSONALIZATION: Fetch User Context if Logged In ---
+        let userContext = "";
+        const token = req.cookies.auth_token;
+        if (token) {
+            try {
+                const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-change-in-prod';
+                const decoded = jwt.verify(token, JWT_SECRET);
+                const user = await prisma.user.findUnique({
+                    where: { id: decoded.userId },
+                    select: { topArtists: true }
+                });
+
+                if (user && user.topArtists && Array.isArray(user.topArtists)) {
+                    const topArtistNames = user.topArtists.slice(0, 10).map(a => a.name).join(', ');
+                    userContext = `The user loves: ${topArtistNames}. Include similar artists or influences.`;
+                    console.log(`[AI] Personalization enabled for user ${decoded.email}`);
+                }
+            } catch (authErr) {
+                console.log('[AI] Personalization skipped (invalid token or guest)');
+            }
+        }
+
         // 1. Generate parameters using Groq (Now returns 'reason' in suggestions)
-        const aiParams = await generatePlaylistParams(mood, vibeType, targetTrackCount, { energy, tempo, valence });
+        const aiParams = await generatePlaylistParams(mood, vibeType, targetTrackCount, { energy, tempo, valence }, userContext);
         console.log('AI Params Generated');
 
         // 2. Search Spotify for each suggested track

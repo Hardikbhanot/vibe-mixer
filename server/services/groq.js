@@ -7,10 +7,12 @@ const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY
 });
 
-export const generatePlaylistParams = async (userPrompt, vibeType = 'mix', trackCount = 20, features = {}) => {
+// Enhanced function signature
+export const generatePlaylistParams = async (userPrompt, vibeType = 'mix', trackCount = 20, features = {}, userContext = "") => {
     console.log('--- Groq Analysis Initiated ---');
     console.log('Vibe Type:', vibeType);
     console.log('Target Tracks:', trackCount);
+    if (userContext) console.log('User Context:', userContext);
 
     let vibeInstruction = "";
     if (vibeType === 'offbeat') {
@@ -29,15 +31,23 @@ export const generatePlaylistParams = async (userPrompt, vibeType = 'mix', track
     - Valence: ${features.valence}% (0=Sad/Dark, 100=Happy/Positive)
     ` : "";
 
+    // Add User Taste Context
+    const tasteContext = userContext ? `
+    USER TASTE PROFILE (Integrate this style):
+    ${userContext}
+    Tailor the recommendations to align with these preferences where appropriate.
+    ` : "";
+
     const DYNAMIC_SYSTEM_PROMPT = `
 You are a world-class DJ and music curator AI. Your goal is to interpret the user's mood or activity and generate a curated list of SPECIFIC SONGS for Spotify.
 
 IMPORTANT INSTRUCTIONS:
 1. **Vibe Strategy**: ${vibeInstruction}
 2. **Exact Vibe Match**: Select songs that PERFECTLY match the user's mood and the target audio features below.${featureContext}
-3. **Language Diversity**: ACTIVELY INCLUDE songs from various languages and regions if they fit the vibe (e.g., Spanish, Korean, French, Hindi, etc.). Do not limit to English unless requested.
-4. **Tracklist**: Generate **${trackCount} specific songs** (Song Title + Artist) to ensure enough content for the requested duration.
-5. **Reasoning**: For EACH song, provide a short, punchy 1-sentence reason why it fits this specific mood.
+3. **Personalization**: ${tasteContext}
+4. **Language Diversity**: ACTIVELY INCLUDE songs from various languages and regions if they fit the vibe (e.g., Spanish, Korean, French, Hindi, etc.). Do not limit to English unless requested.
+5. **Tracklist**: Generate **${trackCount} specific songs** (Song Title + Artist) to ensure enough content for the requested duration.
+6. **Reasoning**: For EACH song, provide a short, punchy 1-sentence reason why it fits this specific mood.
 
 Output MUST be a valid JSON object with the following structure:
 {
