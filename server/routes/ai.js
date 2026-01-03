@@ -70,8 +70,26 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
             }
         }
 
+
+        // --- DATA FRESHNESS: Fetch New Releases from Spotify ---
+        let newReleasesContext = "";
+        try {
+            const newReleases = await req.spotifyApi.getNewReleases({ limit: 10, country: 'US' });
+            if (newReleases.body.albums.items.length > 0) {
+                const freshTracks = newReleases.body.albums.items.map(album =>
+                    `"${album.name}" by ${album.artists[0].name}`
+                ).join(', ');
+                newReleasesContext = `\nJUST RELEASED (Consider these if they fit the vibe): ${freshTracks}`;
+                console.log('[AI] Injected recent releases into context');
+            }
+        } catch (freshErr) {
+            console.warn('[AI] Failed to fetch new releases:', freshErr.message);
+        }
+
         // 1. Generate parameters using Groq (Now returns 'reason' in suggestions)
-        const aiParams = await generatePlaylistParams(mood, vibeType, targetTrackCount, { energy, tempo, valence }, userContext);
+        // Combine userContext and newReleasesContext
+        const combinedContext = (userContext + newReleasesContext).trim();
+        const aiParams = await generatePlaylistParams(mood, vibeType, targetTrackCount, { energy, tempo, valence }, combinedContext);
         console.log('AI Params Generated');
 
         // 2. Search Spotify for each suggested track
