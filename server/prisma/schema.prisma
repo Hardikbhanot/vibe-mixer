@@ -81,6 +81,7 @@ model SwipeHistory {
   userId     String
   songName   String
   artistName String
+  spotifyId  String?  // nullable for backward compatibility
   action     Action
   created_at DateTime @default(now())
   

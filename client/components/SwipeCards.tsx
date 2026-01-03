@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
 import { toast } from 'sonner';
 import Image from 'next/image';
@@ -93,6 +93,7 @@ const SwipeCards = ({ tracks, onEmpty }: SwipeCardsProps) => {
                 body: JSON.stringify({
                     songName: track.name,
                     artistName: track.artists[0].name,
+                    spotifyId: track.id,
                     action: actionString
                 }),
                 credentials: 'include'
@@ -101,6 +102,34 @@ const SwipeCards = ({ tracks, onEmpty }: SwipeCardsProps) => {
             console.error('Swipe error:', error);
         }
     };
+
+    // Infinite Swipe Logic
+    useEffect(() => {
+        // If we are down to 3 cards, trigger load more
+        if (cards.length <= 3 && onEmpty) {
+            // For now, we just call onEmpty which triggers page fetch
+            onEmpty();
+        }
+    }, [cards.length, onEmpty]);
+
+    // Append new tracks to cards when tracks prop updates
+    // PROBLEM: tracks prop is the *new* batch, we need to append.
+    // Actually, page.tsx replaces `tracks`.
+    // Let's modify this component to just use props directly if possible, or synchronize.
+    useEffect(() => {
+        // If the incoming tracks are different/new, append them?
+        // Simplest: only setCards if cards is empty, OR logic in page.tsx manages the append.
+        // Let's assume page.tsx manages the list.
+        // But SwipeCards manages internal state for removal animations.
+
+        // Better approach: When `tracks` prop changes, look for new IDs not in `cards`.
+        const currentIds = new Set(cards.map(c => c.id));
+        const newTracks = tracks.filter(t => !currentIds.has(t.id));
+
+        if (newTracks.length > 0) {
+            setCards(prev => [...newTracks, ...prev]); // Add to back (bottom of stack)
+        }
+    }, [tracks]);
 
     return (
         <div className="relative w-full h-[650px] flex items-center justify-center overflow-hidden">
@@ -116,9 +145,11 @@ const SwipeCards = ({ tracks, onEmpty }: SwipeCardsProps) => {
                     />
                 );
             })}
+
             {cards.length === 0 && (
-                <div className="text-center text-muted-foreground">
-                    <p>No more songs to swipe! 🎵</p>
+                <div className="absolute z-0 flex flex-col items-center justify-center text-muted-foreground animate-pulse">
+                    <span className="material-symbols-outlined text-6xl mb-4">graphic_eq</span>
+                    <p>Finding more vibes...</p>
                 </div>
             )}
 

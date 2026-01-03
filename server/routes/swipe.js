@@ -13,18 +13,24 @@ router.get('/feed', authenticateToken, initSpotifyApi, async (req, res) => {
 
         // 1. Get songs swiped in the last 48 hours (or all time, per user pref "never" also works)
         // Let's do last 7 days for safety, or all time if possible to avoid repeats
+        // 1. Get songs swiped in the last 7 days (or all time)
         const twoDaysAgo = new Date();
-        twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+        twoDaysAgo.setDate(twoDaysAgo.getDate() - 7);
 
         const swipedSongs = await prisma.swipeHistory.findMany({
             where: {
                 userId,
-                // created_at: { gte: twoDaysAgo } // Uncomment to enforce time limit
+                // created_at: { gte: twoDaysAgo } // Uncomment to enforce time limit if needed
             },
-            select: { songName: true, artistName: true }
+            select: { songName: true, artistName: true, spotifyId: true }
         });
 
-        const seenSet = new Set(swipedSongs.map(s => `${s.songName.toLowerCase()}:${s.artistName.toLowerCase()}`));
+        const seenSet = new Set();
+        // Add ID-based dedupe
+        swipedSongs.forEach(s => {
+            if (s.spotifyId) seenSet.add(s.spotifyId);
+            seenSet.add(`${s.songName.toLowerCase()}:${s.artistName.toLowerCase()}`);
+        });
 
         // 2. Search Spotify for a Mix
         // We'll search for a few different vibes to create a mix
@@ -71,7 +77,8 @@ router.get('/feed', authenticateToken, initSpotifyApi, async (req, res) => {
             // Identifier for "seen" check
             const trackKey = `${track.name.toLowerCase()}:${track.artists[0].name.toLowerCase()}`;
 
-            if (!trackIds.has(track.id) && !seenSet.has(trackKey)) {
+            // Check both ID and Name-Artist pair
+            if (!trackIds.has(track.id) && !seenSet.has(track.id) && !seenSet.has(trackKey)) {
                 trackIds.add(track.id);
                 uniqueTracks.push({
                     id: track.id,
@@ -99,7 +106,7 @@ router.get('/feed', authenticateToken, initSpotifyApi, async (req, res) => {
 // Save a swipe action
 router.post('/', authenticateToken, async (req, res) => {
     try {
-        const { songName, artistName, action } = req.body;
+        const { songName, artistName, spotifyId, action } = req.body;
         const userId = req.user.userId;
 
         if (!songName || !artistName || !action) {
@@ -116,6 +123,7 @@ router.post('/', authenticateToken, async (req, res) => {
                 userId,
                 songName,
                 artistName,
+                spotifyId,
                 action
             }
         });
