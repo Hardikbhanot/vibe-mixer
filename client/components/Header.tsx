@@ -49,6 +49,9 @@ export const Header = () => {
                     <Link href="/discover" className="hidden md:block text-sm font-medium hover:text-primary transition-colors text-center">
                         Discover
                     </Link>
+                    <Link href="/match" className="hidden md:block text-sm font-medium hover:text-primary transition-colors text-center">
+                        Match
+                    </Link>
                     <Link href="/india" className="hidden md:block text-sm font-medium hover:text-primary transition-colors text-center">
                         Indian Vibe Map
                     </Link>
@@ -96,6 +99,9 @@ export const Header = () => {
                     </Link>
                     <Link href="/discover" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
                         Discover
+                    </Link>
+                    <Link href="/match" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
+                        Vibe Match
                     </Link>
                     <Link href="/india" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
                         Indian Vibe Map
