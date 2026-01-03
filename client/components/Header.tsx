@@ -19,51 +19,71 @@ export const Header = () => {
 
     return (
         <>
-            <header className="flex items-center p-4 pb-2 justify-between sticky top-0 z-50 bg-background-light dark:bg-background-dark/80 backdrop-blur-sm transition-colors duration-300">
+            <header className="flex items-center px-6 py-3 justify-between sticky top-0 z-50 bg-background-light/70 dark:bg-background-dark/70 backdrop-blur-xl border-b border-black/5 dark:border-white/5 transition-all duration-300">
                 {/* Left: Back or Logo */}
-                {pathname === '/' ? (
-                    <div className="size-10"></div> // Spacer
-                ) : (
-                    <button
-                        onClick={() => router.back()}
-                        className="text-foreground flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                    >
-                        <span className="material-symbols-outlined text-2xl">arrow_back</span>
-                    </button>
-                )}
+                <div className="flex items-center gap-4">
+                    {pathname !== '/' && (
+                        <button
+                            onClick={() => router.back()}
+                            className="hidden md:flex text-foreground size-10 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                        >
+                            <span className="material-symbols-outlined text-2xl">arrow_back</span>
+                        </button>
+                    )}
 
-                {/* Center: Branding */}
-                <Link href="/" className="flex items-center gap-2 flex-1 justify-center hover:opacity-80 transition-opacity">
-                    <img src="/logo.png" alt="Logo" className="w-12 h-12 object-contain" />
-                    <h1 className="text-foreground text-3xl font-bold leading-tight tracking-[-0.015em] hidden md:block">
-                        VibeMixer
-                    </h1>
-                </Link>
-
-                {/* Right: Actions */}
-                <div className="flex items-center gap-3 justify-end min-w-[120px]">
-                    {/* Desktop Navigation */}
-                    <Link href="/swipe" className="hidden md:block text-sm font-medium hover:text-primary transition-colors text-center">
-                        Swipe Mode
+                    {/* Branding */}
+                    <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                        <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain" />
+                        <h1 className="text-foreground text-2xl font-bold tracking-tight hidden md:block bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                            VibeMixer
+                        </h1>
                     </Link>
-                    <Link href="/discover" className="hidden md:block text-sm font-medium hover:text-primary transition-colors text-center">
+                </div>
+
+                {/* Center: Navigation (Desktop) */}
+                <nav className="hidden md:flex items-center gap-1 bg-surface-light/50 dark:bg-surface-dark/50 p-1 rounded-full border border-black/5 dark:border-white/5 backdrop-blur-sm">
+                    <Link
+                        href="/generate"
+                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${pathname === '/generate' ? 'bg-primary text-background-dark shadow-sm' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    >
+                        ✨ Generate
+                    </Link>
+                    <Link
+                        href="/swipe"
+                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${pathname === '/swipe' ? 'bg-primary text-background-dark shadow-sm' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    >
+                        Swipe
+                    </Link>
+                    <Link
+                        href="/discover"
+                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${pathname === '/discover' ? 'bg-primary text-background-dark shadow-sm' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    >
                         Discover
                     </Link>
-                    <Link href="/match" className="hidden md:block text-sm font-medium hover:text-primary transition-colors text-center">
+                    <Link
+                        href="/match"
+                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${pathname === '/match' ? 'bg-primary text-background-dark shadow-sm' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    >
                         Match
                     </Link>
-                    <Link href="/india" className="hidden md:block text-sm font-medium hover:text-primary transition-colors text-center">
-                        Indian Vibe Map
+                    <Link
+                        href="/india"
+                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${pathname === '/india' ? 'bg-primary text-background-dark shadow-sm' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    >
+                        Map
                     </Link>
-                    <Link href="/messages" className="hidden md:block text-sm font-medium hover:text-primary transition-colors text-center">
-                        Messages
-                    </Link>
-                    <ThemeToggle />
+                </nav>
+
+                {/* Right: Actions */}
+                <div className="flex items-center gap-3 justify-end">
+                    <div className="hidden md:block">
+                        <ThemeToggle />
+                    </div>
 
                     {!loading && !isAuthPage && (
                         user ? (
                             <Link href="/profile" className="relative group hidden md:block">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-secondary p-[2px]">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-secondary p-[2px] transition-transform group-hover:scale-105">
                                     <div className="w-full h-full rounded-full bg-background-light dark:bg-background-dark flex items-center justify-center overflow-hidden">
                                         {user.avatarUrl ? (
                                             <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
@@ -75,7 +95,7 @@ export const Header = () => {
                             </Link>
                         ) : (
                             <Link href="/auth" className="hidden md:block">
-                                <button className="px-4 py-2 rounded-full bg-primary/10 hover:bg-primary/20 text-primary font-bold text-sm transition-colors">
+                                <button className="px-5 py-2 rounded-full bg-primary text-background-dark font-bold text-sm transition-transform hover:scale-105 shadow-lg shadow-primary/25">
                                     Login
                                 </button>
                             </Link>
@@ -96,22 +116,30 @@ export const Header = () => {
 
             {/* Mobile Menu Overlay */}
             {isMenuOpen && (
-                <div className="fixed inset-0 z-40 bg-background-light dark:bg-background-dark flex flex-col items-center justify-center gap-8 md:hidden animate-in fade-in slide-in-from-top-10 duration-200">
-                    <Link href="/swipe" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
-                        Swipe Mode
-                    </Link>
-                    <Link href="/discover" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
-                        Discover
-                    </Link>
-                    <Link href="/match" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
-                        Vibe Match
-                    </Link>
-                    <Link href="/india" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
-                        Indian Vibe Map
-                    </Link>
-                    <Link href="/messages" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
-                        Messages
-                    </Link>
+                <div className="fixed inset-0 z-40 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-xl flex flex-col items-center justify-center gap-8 md:hidden animate-in fade-in zoom-in-95 duration-200 p-6">
+                    <ThemeToggle />
+
+                    <nav className="flex flex-col items-center gap-6 w-full max-w-xs">
+                        <Link href="/generate" onClick={closeMenu} className="w-full py-4 text-center rounded-2xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xl font-bold">
+                            ✨ Generate Mix
+                        </Link>
+                        <div className="w-full h-px bg-border/50"></div>
+                        <Link href="/swipe" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
+                            Swipe Mode
+                        </Link>
+                        <Link href="/discover" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
+                            Discover
+                        </Link>
+                        <Link href="/match" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
+                            Vibe Match
+                        </Link>
+                        <Link href="/india" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
+                            Global Map
+                        </Link>
+                        <Link href="/messages" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
+                            Messages
+                        </Link>
+                    </nav>
 
                     {!loading && !isAuthPage && (
                         user ? (
@@ -129,8 +157,8 @@ export const Header = () => {
                             </Link>
                         ) : (
                             <Link href="/auth" onClick={closeMenu}>
-                                <button className="px-8 py-3 rounded-full bg-primary text-white font-bold text-lg transition-colors shadow-lg">
-                                    Login
+                                <button className="px-8 py-3 rounded-full bg-primary text-background-dark font-bold text-lg transition-transform active:scale-95 shadow-lg shadow-primary/25">
+                                    Login to Vibe
                                 </button>
                             </Link>
                         )
