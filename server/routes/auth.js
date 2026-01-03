@@ -166,10 +166,10 @@ router.post('/register', async (req, res) => {
 
         res.cookie('auth_token', token, {
             httpOnly: true,
-            secure: true,
+            secure: isProduction ? true : false,
             maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
             path: '/',
-            sameSite: 'none',
+            sameSite: isProduction ? 'none' : 'lax',
             domain: domain
         });
 
@@ -203,10 +203,10 @@ router.post('/login', async (req, res) => {
 
         res.cookie('auth_token', token, {
             httpOnly: true,
-            secure: true,
+            secure: isProduction ? true : false,
             maxAge: 30 * 24 * 60 * 60 * 1000,
             path: '/',
-            sameSite: 'none',
+            sameSite: isProduction ? 'none' : 'lax',
             domain: domain
         });
 
@@ -469,29 +469,29 @@ router.get('/google/callback', async (req, res) => {
         // Set Auth Token Cookie
         res.cookie('auth_token', token, {
             httpOnly: true,
-            secure: true,
+            secure: isProduction ? true : false,
             maxAge: 30 * 24 * 60 * 60 * 1000,
             path: '/',
-            sameSite: 'none',
+            sameSite: isProduction ? 'none' : 'lax',
             domain: domain
         });
 
         // Set tokens in cookies
         res.cookie('google_access_token', access_token, {
             httpOnly: true,
-            secure: true,
+            secure: isProduction ? true : false,
             maxAge: expires_in * 1000,
             path: '/',
-            sameSite: 'none',
+            sameSite: isProduction ? 'none' : 'lax',
             domain: domain
         });
 
         if (refresh_token) {
             res.cookie('google_refresh_token', refresh_token, {
                 httpOnly: true,
-                secure: true,
+                secure: isProduction ? true : false,
                 path: '/',
-                sameSite: 'none',
+                sameSite: isProduction ? 'none' : 'lax',
                 domain: domain
             });
         }
