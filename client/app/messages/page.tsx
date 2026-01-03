@@ -7,6 +7,7 @@ import { Header } from '../../components/Header';
 import ChatInterface from './chat-interface';
 import { MessageSquare, Search, User, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
+import { toast } from 'sonner';
 
 function MessagesContent() {
     const { user, loading } = useAuth();
@@ -36,6 +37,7 @@ function MessagesContent() {
 
             // check if we need to insert the target user (if not already in list)
             if (targetUserId) {
+                console.log("Checking target user:", targetUserId);
                 const existing = convos.find((c: any) => c.user.id === targetUserId);
                 if (existing) {
                     setSelectedChat(existing.user);
@@ -58,9 +60,14 @@ function MessagesContent() {
                             // Add to top
                             convos = [newConvo, ...convos];
                             setSelectedChat(newUser);
+                            toast.success(`Starting chat with @${newUser.username}`);
+                        } else {
+                            console.error("Failed to fetch target user");
+                            toast.error("User not found or unavailable.");
                         }
                     } catch (e) {
                         console.error('Failed to fetch target user', e);
+                        toast.error("Connection error loading chat.");
                     }
                 }
             }
