@@ -205,7 +205,7 @@ function ResultsContent() {
         if (!data) return;
         setIsSaving(true);
         try {
-            const finalCoverImage = coverImage || `https://image.pollinations.ai/prompt/${encodeURIComponent(data.cover_art_description || data.playlist_name)}?width=512&height=512&nologo=true`;
+            const finalCoverImage = coverImage || 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=512&h=512&fit=crop'; // Fallback if backend fails
             const apiUrl = '';
 
             const response = await fetch(`${apiUrl}/spotify/playlist`, {
