@@ -76,11 +76,11 @@ export default function DiscoverPage() {
                         </Link>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
                         {playlists.map((playlist) => (
                             // Link to the specific mix page
-                            <Link key={playlist.id} href={`/mix/${playlist.id}`} className="block">
-                                <div className="group relative bg-surface-light dark:bg-surface-dark rounded-3xl overflow-hidden hover:shadow-xl transition-all border border-foreground/5 hover:border-primary/20 flex flex-col h-full hover:-translate-y-1">
+                            <Link key={playlist.id} href={`/mix/${playlist.id}`} className="block break-inside-avoid">
+                                <div className="group relative bg-surface-light dark:bg-surface-dark rounded-3xl overflow-hidden hover:shadow-xl transition-all border border-foreground/5 hover:border-primary/20 flex flex-col h-full hover:-translate-y-1 transform-gpu">
 
                                     {/* Cover Image with Play Overlay */}
                                     <div className="aspect-square relative overflow-hidden bg-black/5">

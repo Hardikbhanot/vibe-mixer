@@ -29,6 +29,7 @@ model User {
 
 
   // Relations
+  // Relations
   matchesAsA    Match[]        @relation("UserMatchesA")
   matchesAsB    Match[]        @relation("UserMatchesB")
   likes         Like[]
