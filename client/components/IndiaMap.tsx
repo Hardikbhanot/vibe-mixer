@@ -5,7 +5,7 @@ import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simp
 import { scaleQuantile } from "d3-scale";
 import { Tooltip } from "react-tooltip";
 
-const INDIA_TOPO_JSON = "https://raw.githubusercontent.com/udit-001/india-maps-data/main/topojson/india.json";
+const INDIA_TOPO_JSON = "/india-map.json";
 
 interface IndiaMapProps {
     onRegionSelect: (regionName: string) => void;
