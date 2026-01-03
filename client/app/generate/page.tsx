@@ -16,6 +16,7 @@ export default function GeneratePage() {
     const [valence, setValence] = useState(30);
     const [duration, setDuration] = useState(60); // Default 60 minutes
     const [vibeType, setVibeType] = useState<'offbeat' | 'popular' | 'mix'>('mix');
+    const [model, setModel] = useState('llama-3.3-70b-versatile');
     const [isLoading, setIsLoading] = useState(false);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
@@ -43,7 +44,8 @@ export default function GeneratePage() {
                     vibeType, // Send vibe preference
                     energy,
                     tempo,
-                    valence
+                    valence,
+                    model // Pass selected model
                 }),
                 credentials: 'include',
             });
@@ -224,136 +226,148 @@ export default function GeneratePage() {
 
 
                 {/* Advanced Controls Sliders */}
-                {isAdvanced && (
-                    <div className="flex flex-col space-y-6 pt-2 animate-in fade-in slide-in-from-top-4 duration-300">
+                {/* Model Selection (Pro Feature) */}
+                <div className="flex flex-col gap-3">
+                    <p className="text-foreground text-base font-medium leading-normal">
+                        AI Model (Brain) 🧠
+                    </p>
+                    <select
+                        onChange={(e) => setModel(e.target.value)}
+                        value={model}
+                        className="w-full bg-surface-dark text-white rounded-lg p-3 border border-white/10 focus:border-primary focus:outline-none"
+                    >
+                        <option value="llama-3.3-70b-versatile">Llama 3.3 (Standard - Reliable)</option>
+                        <option value="openai/gpt-oss-120b">GPT-OSS 120B (Experimental - Smartest)</option>
+                    </select>
+                    <p className="text-xs text-white/40 px-1">
+                        GPT-OSS is smarter but may hit rate limits. We auto-fallback if it fails.
+                    </p>
+                </div>
 
-                        {/* Vibe Type Selection */}
-                        <div className="flex flex-col gap-3">
-                            <p className="text-foreground text-base font-medium leading-normal">
-                                Vibe Type
-                            </p>
-                            <div className="grid grid-cols-3 gap-2">
-                                <button
-                                    onClick={() => setVibeType('offbeat')}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${vibeType === 'offbeat'
-                                        ? 'bg-primary text-background-dark'
-                                        : 'bg-surface-dark text-white hover:bg-white/10'
-                                        }`}
-                                >
-                                    Offbeat
-                                </button>
-                                <button
-                                    onClick={() => setVibeType('popular')}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${vibeType === 'popular'
-                                        ? 'bg-primary text-background-dark'
-                                        : 'bg-surface-dark text-white hover:bg-white/10'
-                                        }`}
-                                >
-                                    Popular
-                                </button>
-                                <button
-                                    onClick={() => setVibeType('mix')}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${vibeType === 'mix'
-                                        ? 'bg-primary text-background-dark'
-                                        : 'bg-surface-dark text-white hover:bg-white/10'
-                                        }`}
-                                >
-                                    Mix
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Duration Slider */}
-                        <div className="@container">
-                            <div className="relative flex w-full flex-col items-start justify-between gap-3">
-                                <div className="flex w-full shrink-[3] items-center justify-between">
-                                    <p className="text-foreground text-base font-medium leading-normal">
-                                        Duration
-                                    </p>
-                                    <p className="text-foreground/70 text-sm font-normal leading-normal">
-                                        {duration} mins
-                                    </p>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="15"
-                                    max="180"
-                                    step="5"
-                                    value={duration}
-                                    onChange={(e) => setDuration(Number(e.target.value))}
-                                    className="w-full h-2 bg-surface-dark rounded-lg appearance-none cursor-pointer accent-white"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Energy Slider */}
-                        <div className="@container">
-                            <div className="relative flex w-full flex-col items-start justify-between gap-3">
-                                <div className="flex w-full shrink-[3] items-center justify-between">
-                                    <p className="text-foreground text-base font-medium leading-normal">
-                                        Energy
-                                    </p>
-                                    <p className="text-foreground/70 text-sm font-normal leading-normal">
-                                        {energy}%
-                                    </p>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    value={energy}
-                                    onChange={(e) => setEnergy(Number(e.target.value))}
-                                    className="w-full h-2 bg-surface-dark rounded-lg appearance-none cursor-pointer accent-white"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Tempo Slider */}
-                        <div className="@container">
-                            <div className="relative flex w-full flex-col items-start justify-between gap-3">
-                                <div className="flex w-full shrink-[3] items-center justify-between">
-                                    <p className="text-foreground text-base font-medium leading-normal">
-                                        Tempo
-                                    </p>
-                                    <p className="text-foreground/70 text-sm font-normal leading-normal">
-                                        {tempo}%
-                                    </p>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    value={tempo}
-                                    onChange={(e) => setTempo(Number(e.target.value))}
-                                    className="w-full h-2 bg-surface-dark rounded-lg appearance-none cursor-pointer accent-white"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Valence Slider */}
-                        <div className="@container">
-                            <div className="relative flex w-full flex-col items-start justify-between gap-3">
-                                <div className="flex w-full shrink-[3] items-center justify-between">
-                                    <p className="text-foreground text-base font-medium leading-normal">
-                                        Valence (Positivity)
-                                    </p>
-                                    <p className="text-foreground/70 text-sm font-normal leading-normal">
-                                        {valence}%
-                                    </p>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    value={valence}
-                                    onChange={(e) => setValence(Number(e.target.value))}
-                                    className="w-full h-2 bg-surface-dark rounded-lg appearance-none cursor-pointer accent-white"
-                                />
-                            </div>
-                        </div>
+                {/* Vibe Type Selection */}
+                <div className="flex flex-col gap-3">
+                    <p className="text-foreground text-base font-medium leading-normal">
+                        Vibe Type
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                        <button
+                            onClick={() => setVibeType('offbeat')}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${vibeType === 'offbeat'
+                                ? 'bg-primary text-background-dark'
+                                : 'bg-surface-dark text-white hover:bg-white/10'
+                                }`}
+                        >
+                            Offbeat
+                        </button>
+                        <button
+                            onClick={() => setVibeType('popular')}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${vibeType === 'popular'
+                                ? 'bg-primary text-background-dark'
+                                : 'bg-surface-dark text-white hover:bg-white/10'
+                                }`}
+                        >
+                            Popular
+                        </button>
+                        <button
+                            onClick={() => setVibeType('mix')}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${vibeType === 'mix'
+                                ? 'bg-primary text-background-dark'
+                                : 'bg-surface-dark text-white hover:bg-white/10'
+                                }`}
+                        >
+                            Mix
+                        </button>
                     </div>
-                )}
+                </div>
 
+                {/* Duration Slider */}
+                <div className="@container">
+                    <div className="relative flex w-full flex-col items-start justify-between gap-3">
+                        <div className="flex w-full shrink-[3] items-center justify-between">
+                            <p className="text-foreground text-base font-medium leading-normal">
+                                Duration
+                            </p>
+                            <p className="text-foreground/70 text-sm font-normal leading-normal">
+                                {duration} mins
+                            </p>
+                        </div>
+                        <input
+                            type="range"
+                            min="15"
+                            max="180"
+                            step="5"
+                            value={duration}
+                            onChange={(e) => setDuration(Number(e.target.value))}
+                            className="w-full h-2 bg-surface-dark rounded-lg appearance-none cursor-pointer accent-white"
+                        />
+                    </div>
+                </div>
+
+                {/* Energy Slider */}
+                <div className="@container">
+                    <div className="relative flex w-full flex-col items-start justify-between gap-3">
+                        <div className="flex w-full shrink-[3] items-center justify-between">
+                            <p className="text-foreground text-base font-medium leading-normal">
+                                Energy
+                            </p>
+                            <p className="text-foreground/70 text-sm font-normal leading-normal">
+                                {energy}%
+                            </p>
+                        </div>
+                        <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={energy}
+                            onChange={(e) => setEnergy(Number(e.target.value))}
+                            className="w-full h-2 bg-surface-dark rounded-lg appearance-none cursor-pointer accent-white"
+                        />
+                    </div>
+                </div>
+
+                {/* Tempo Slider */}
+                <div className="@container">
+                    <div className="relative flex w-full flex-col items-start justify-between gap-3">
+                        <div className="flex w-full shrink-[3] items-center justify-between">
+                            <p className="text-foreground text-base font-medium leading-normal">
+                                Tempo
+                            </p>
+                            <p className="text-foreground/70 text-sm font-normal leading-normal">
+                                {tempo}%
+                            </p>
+                        </div>
+                        <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={tempo}
+                            onChange={(e) => setTempo(Number(e.target.value))}
+                            className="w-full h-2 bg-surface-dark rounded-lg appearance-none cursor-pointer accent-white"
+                        />
+                    </div>
+                </div>
+
+                {/* Valence Slider */}
+                <div className="@container">
+                    <div className="relative flex w-full flex-col items-start justify-between gap-3">
+                        <div className="flex w-full shrink-[3] items-center justify-between">
+                            <p className="text-foreground text-base font-medium leading-normal">
+                                Valence (Positivity)
+                            </p>
+                            <p className="text-foreground/70 text-sm font-normal leading-normal">
+                                {valence}%
+                            </p>
+                        </div>
+                        <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={valence}
+                            onChange={(e) => setValence(Number(e.target.value))}
+                            className="w-full h-2 bg-surface-dark rounded-lg appearance-none cursor-pointer accent-white"
+                        />
+                    </div>
+                </div>
                 <div className="flex-grow"></div>
 
                 {/* Loading Status Section */}

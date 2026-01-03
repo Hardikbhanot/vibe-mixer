@@ -35,7 +35,7 @@ router.post('/image', async (req, res) => {
 // --- 2. Main Playlist Analysis Route ---
 router.post('/analyze', initSpotifyApi, async (req, res) => {
     console.log('POST /ai/analyze hit');
-    const { mood, duration = 60, vibeType = 'mix', energy, tempo, valence } = req.body;
+    const { mood, duration = 60, vibeType = 'mix', energy, tempo, valence, model } = req.body;
 
     if (!mood) {
         return res.status(400).json({ error: 'Mood is required' });
@@ -103,7 +103,7 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
         // 1. Generate parameters using Groq (Now returns 'reason' in suggestions)
         // Combine contexts
         const combinedContext = (userContext + newReleasesContext).trim();
-        const aiParams = await generatePlaylistParams(mood, vibeType, targetTrackCount, { energy, tempo, valence }, combinedContext);
+        const aiParams = await generatePlaylistParams(mood, vibeType, targetTrackCount, { energy, tempo, valence }, combinedContext, model);
         console.log('AI Params Generated');
 
         // 2. Search Spotify for each suggested track

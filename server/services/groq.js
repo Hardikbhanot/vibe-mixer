@@ -7,11 +7,43 @@ const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY
 });
 
+const DEFAULT_MODEL = "llama-3.3-70b-versatile";
+const FALLBACK_MODEL = "llama-3.3-70b-versatile"; // Fallback is always the reliable one
+
+// Helper for Model Fallback Logic
+const callGroqWithFallback = async (messages, preferredModel = DEFAULT_MODEL, temperature = 0.7, jsonMode = true) => {
+    try {
+        console.log(`[Groq] Attempting with Model: ${preferredModel}`);
+        return await groq.chat.completions.create({
+            messages,
+            model: preferredModel,
+            response_format: jsonMode ? { type: "json_object" } : undefined,
+            temperature,
+        });
+    } catch (error) {
+        // Check for Rate Limit (429) or Model Not Found (404) or Bad Request (400 - sometimes happens with beta models)
+        if (error.status === 429 || error.code === 'rate_limit_exceeded' || error.status === 404 || error.status === 400) {
+            console.warn(`[Groq] Model ${preferredModel} failed (${error.status || error.code}). Falling back to ${FALLBACK_MODEL}...`);
+
+            // If we were already using fallback, just throw to avoid infinite loop
+            if (preferredModel === FALLBACK_MODEL) throw error;
+
+            return await groq.chat.completions.create({
+                messages,
+                model: FALLBACK_MODEL,
+                response_format: jsonMode ? { type: "json_object" } : undefined,
+                temperature,
+            });
+        }
+        throw error; // Re-throw other errors
+    }
+};
+
 // Enhanced function signature
-export const generatePlaylistParams = async (userPrompt, vibeType = 'mix', trackCount = 20, features = {}, userContext = "") => {
+export const generatePlaylistParams = async (userPrompt, vibeType = 'mix', trackCount = 20, features = {}, userContext = "", preferredModel = DEFAULT_MODEL) => {
     console.log('--- Groq Analysis Initiated ---');
     console.log('Vibe Type:', vibeType);
-    console.log('Target Tracks:', trackCount);
+    console.log('Model:', preferredModel);
     if (userContext) console.log('User Context:', userContext);
 
     let vibeInstruction = "";
@@ -39,46 +71,41 @@ export const generatePlaylistParams = async (userPrompt, vibeType = 'mix', track
     ` : "";
 
     const DYNAMIC_SYSTEM_PROMPT = `
-You are a world-class DJ and music curator AI. Your goal is to interpret the user's mood or activity and generate a curated list of SPECIFIC SONGS for Spotify.
+    You are a world-class DJ and music curator AI. Your goal is to interpret the user's mood or activity and generate a curated list of SPECIFIC SONGS for Spotify.
 
-IMPORTANT INSTRUCTIONS:
-1. **Vibe Strategy**: ${vibeInstruction}
-2. **Exact Vibe Match**: Select songs that PERFECTLY match the user's mood and the target audio features below.${featureContext}
-3. **Personalization**: ${tasteContext}
-4. **Language Diversity**: ACTIVELY INCLUDE songs from various languages and regions if they fit the vibe (e.g., Spanish, Korean, French, Hindi, etc.). Do not limit to English unless requested.
-5. **Tracklist**: Generate **${trackCount} specific songs** (Song Title + Artist) to ensure enough content for the requested duration.
-6. **Reasoning**: For EACH song, provide a short, punchy 1-sentence reason why it fits this specific mood.
+    IMPORTANT INSTRUCTIONS:
+    1. **Vibe Strategy**: ${vibeInstruction}
+    2. **Exact Vibe Match**: Select songs that PERFECTLY match the user's mood and the target audio features below.${featureContext}
+    3. **Personalization**: ${tasteContext}
+    4. **Language Diversity**: ACTIVELY INCLUDE songs from various languages and regions if they fit the vibe (e.g., Spanish, Korean, French, Hindi, etc.). Do not limit to English unless requested.
+    5. **Tracklist**: Generate **${trackCount} specific songs** (Song Title + Artist) to ensure enough content for the requested duration.
+    6. **Reasoning**: For EACH song, provide a short, punchy 1-sentence reason why it fits this specific mood.
 
-Output MUST be a valid JSON object with the following structure:
-{
-  "suggested_tracks": [
-    { 
-      "song": "Song Name 1", 
-      "artist": "Artist Name 1",
-      "reason": "Short reason why this song fits the vibe."
-    },
-    { 
-      "song": "Song Name 2", 
-      "artist": "Artist Name 2",
-      "reason": "Short reason why this song fits the vibe."
+    Output MUST be a valid JSON object with the following structure:
+    {
+      "suggested_tracks": [
+        { 
+          "song": "Song Name 1", 
+          "artist": "Artist Name 1",
+          "reason": "Short reason why this song fits the vibe."
+        },
+        { 
+          "song": "Song Name 2", 
+          "artist": "Artist Name 2",
+          "reason": "Short reason why this song fits the vibe."
+        }
+      ], 
+      "playlist_name": "Creative Playlist Name",
+      "playlist_description": "A short description of the vibe.",
+      "cover_art_description": "A vivid, artistic, and abstract description of a cover image that represents this vibe. Do not include text."
     }
-  ], 
-  "playlist_name": "Creative Playlist Name",
-  "playlist_description": "A short description of the vibe.",
-  "cover_art_description": "A vivid, artistic, and abstract description of a cover image that represents this vibe. Do not include text."
-}
-`;
+    `;
 
     try {
-        const completion = await groq.chat.completions.create({
-            messages: [
-                { role: "system", content: DYNAMIC_SYSTEM_PROMPT },
-                { role: "user", content: userPrompt },
-            ],
-            model: "llama-3.3-70b-versatile",
-            response_format: { type: "json_object" },
-            temperature: 0.7,
-        });
+        const completion = await callGroqWithFallback([
+            { role: "system", content: DYNAMIC_SYSTEM_PROMPT },
+            { role: "user", content: userPrompt },
+        ], preferredModel, 0.7);
 
         const content = completion.choices[0]?.message?.content;
         console.log('Groq Response Length:', content.length);
@@ -108,15 +135,10 @@ export const getRegionalVibeQuery = async (region) => {
     `;
 
     try {
-        const completion = await groq.chat.completions.create({
-            messages: [
-                { role: "system", content: "You are a music curator specializing in Indian regional music. Output JSON only." },
-                { role: "user", content: prompt },
-            ],
-            model: "llama-3.3-70b-versatile",
-            response_format: { type: "json_object" },
-            temperature: 0.7,
-        });
+        const completion = await callGroqWithFallback([
+            { role: "system", content: "You are a music curator specializing in Indian regional music. Output JSON only." },
+            { role: "user", content: prompt },
+        ], DEFAULT_MODEL, 0.7);
 
         const content = completion.choices[0]?.message?.content;
         console.log('[Groq] Vibe Query:', content);
@@ -198,15 +220,10 @@ export const generateVibeAnalysis = async (topArtists, topTracks) => {
     `;
 
     try {
-        const completion = await groq.chat.completions.create({
-            messages: [
-                { role: "system", content: "You are a cool music trend analyzer. You speak in a modern, Gen-Z friendly tone. Output JSON only." },
-                { role: "user", content: prompt },
-            ],
-            model: "llama-3.3-70b-versatile",
-            response_format: { type: "json_object" },
-            temperature: 0.8,
-        });
+        const completion = await callGroqWithFallback([
+            { role: "system", content: "You are a cool music trend analyzer. You speak in a modern, Gen-Z friendly tone. Output JSON only." },
+            { role: "user", content: prompt },
+        ], DEFAULT_MODEL, 0.8);
 
         const content = completion.choices[0]?.message?.content;
         console.log('[Groq] Vibe Analysis:', content);
