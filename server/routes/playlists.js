@@ -1,9 +1,10 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
-import { authenticateToken } from '../middleware/auth.js'; // Ensure you have this
+import { authenticateToken } from '../middleware/auth.js';
+import prisma from '../lib/prisma.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
+// const prisma = new PrismaClient(); // REMOVED
 
 // 1. Save a Playlist to History
 router.post('/', authenticateToken, async (req, res) => {
@@ -11,6 +12,7 @@ router.post('/', authenticateToken, async (req, res) => {
         const { name, description, coverImage, mood, tracks, isPublic } = req.body;
         const userId = req.user.userId; // Extracted from JWT
         console.log(`[Playlist] Saving for user ${userId}: ${name}`);
+        console.log(`[Playlist] Data: Tracks=${tracks?.length}, Public=${isPublic}, Mood=${mood}`);
 
         // Validate User Existence (Fix for Stale Token/DB Reset)
         const userExists = await prisma.user.findUnique({ where: { id: userId } });
@@ -38,7 +40,7 @@ router.post('/', authenticateToken, async (req, res) => {
                 description,
                 coverImage,
                 mood,
-                tracks: tracks || [], // Ensure tracks is at least an empty array
+                tracks: Array.isArray(tracks) ? tracks : [], // Force array
                 isPublic: isPublic || false, // Default to private if not specified
                 userId
             }

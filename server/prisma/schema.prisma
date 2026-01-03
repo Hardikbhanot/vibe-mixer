@@ -12,6 +12,8 @@ model User {
   email         String         @unique
   password_hash String
   created_at    DateTime       @default(now())
+  resetToken    String?
+  resetTokenExpiry DateTime?
   
   
   swipes        SwipeHistory[]
@@ -21,6 +23,7 @@ model User {
   username      String?        @unique
   isPublic      Boolean        @default(false)
   isMatchable   Boolean        @default(false)
+  isAdmin       Boolean        @default(false)
   bio           String?
   avatarUrl     String?        // Base64 string for profile picture
   vibeTags      Json?          // AI generated vibe tags

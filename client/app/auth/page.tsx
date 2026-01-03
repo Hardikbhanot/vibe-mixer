@@ -192,6 +192,13 @@ export default function AuthPage() {
                                         Must contain 1 number, 1 uppercase, 1 lowercase.
                                     </p>
                                 )}
+                                {isLogin && (
+                                    <div className="flex justify-end mt-1">
+                                        <Link href="/auth/forgot-password" className="text-xs font-medium text-primary hover:underline">
+                                            Forgot Password?
+                                        </Link>
+                                    </div>
+                                )}
                             </div>
 
                             <AnimatePresence>

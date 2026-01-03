@@ -22,10 +22,107 @@ const scopes = [
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import prisma from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
+// const prisma = new PrismaClient(); // REMOVED to prevent connection leak
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-change-in-prod';
+import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 
+// --- Email Transporter ---
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
+
+// 1. Forgot Password
+router.post('/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await prisma.user.findUnique({ where: { email } });
+
+        if (!user) {
+            // Fake success for security
+            return res.json({ message: 'If that email exists, we sent a link.' });
+        }
+
+        // Generate Token
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 Hour
+
+        await prisma.user.update({
+            where: { email },
+            data: {
+                resetToken,
+                resetTokenExpiry
+            }
+        });
+
+        // Email Link
+        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        const resetLink = `${clientUrl}/auth/reset-password?token=${resetToken}`;
+
+        // Send Email (or Log)
+        // Send Email (or Log)
+        if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+            try {
+                await transporter.sendMail({
+                    from: '"VibeMixer Security" <no-reply@vibemixer.tech>',
+                    to: email,
+                    subject: 'Reset Your VibeMixer Password',
+                    html: `<p>You requested a password reset.</p><p>Click here: <a href="${resetLink}">${resetLink}</a></p>`
+                });
+                console.log(`[Forgot Password] Email sent to ${email}`);
+            } catch (emailError) {
+                console.error('[Forgot Password] Email sending failed (Bad Credentials?):', emailError.message);
+                console.log(`[Forgot Password] FALLBACK LINK: ${resetLink}`);
+            }
+        } else {
+            console.log(`[Forgot Password] Env vars missing. Link: ${resetLink}`);
+        }
+
+        res.json({ message: 'If that email exists, we sent a link.' });
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({ error: 'Server error', details: error.message, stack: error.toString() });
+    }
+});
+
+// 2. Reset Password
+router.post('/reset-password', async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+
+        const user = await prisma.user.findFirst({
+            where: {
+                resetToken: token,
+                resetTokenExpiry: { gt: new Date() }
+            }
+        });
+
+        if (!user) {
+            return res.status(400).json({ error: 'Invalid or expired token' });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                password_hash: hashedPassword,
+                resetToken: null,
+                resetTokenExpiry: null
+            }
+        });
+
+        res.json({ message: 'Password reset successful' });
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
 // --- Standard Auth (Email/Password) ---
 
 // Register

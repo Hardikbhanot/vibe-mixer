@@ -14,6 +14,7 @@ import swipeRoutes from './routes/swipe.js';
 import userRoutes from './routes/user.js';
 import playlistRoutes from './routes/playlists.js';
 import matchRoutes from './routes/match.js';
+import adminRoutes from './routes/admin.js';
 
 
 const app = express();
@@ -51,7 +52,8 @@ app.use('/youtube', youtubeRoutes);
 app.use('/api/swipe', swipeRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/playlists', playlistRoutes);
-app.use('/api/match', matchRoutes);
+app.use('/api/match', matchRoutes); // New Route
+app.use('/api/admin', adminRoutes);
 
 app.get("/", (req, res) => {
   res.send("Backend is running!");
