@@ -53,7 +53,11 @@ export default function IndiaVibePage() {
                 body: JSON.stringify({
                     name: `${selectedRegion} Vibes - VibeMixer`,
                     description: `Top songs from ${selectedRegion} curated by VibeMixer.`,
-                    tracks: videos.map(v => ({ name: v.title, artists: [{ name: v.channelTitle }] })) // Mocking track structure for existing endpoint
+                    tracks: videos.map(v => ({
+                        name: v.title,
+                        artists: [{ name: v.channelTitle }],
+                        videoId: v.id // Pass ID to skip search cost
+                    }))
                 }),
                 credentials: 'include'
             });

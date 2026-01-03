@@ -76,7 +76,13 @@ router.post('/playlist', initYoutubeClient, async (req, res) => {
         const videoIds = [];
         for (const track of tracks) {
             try {
-                // Search for "Song Name Artist Name Official Video"
+                // OPTIMIZATION: Use provided ID to save Search Quota (100 units per song)
+                if (track.videoId) {
+                    videoIds.push(track.videoId);
+                    continue;
+                }
+
+                // Fallback: Search for "Song Name Artist Name Official Video"
                 const query = `${track.name} ${track.artists[0].name} Official Video`;
                 const searchRes = await req.youtube.search.list({
                     part: ['snippet'],
