@@ -55,6 +55,9 @@ export const Header = () => {
                     <Link href="/india" className="hidden md:block text-sm font-medium hover:text-primary transition-colors text-center">
                         Indian Vibe Map
                     </Link>
+                    <Link href="/messages" className="hidden md:block text-sm font-medium hover:text-primary transition-colors text-center">
+                        Messages
+                    </Link>
                     <ThemeToggle />
 
                     {!loading && !isAuthPage && (
@@ -105,6 +108,9 @@ export const Header = () => {
                     </Link>
                     <Link href="/india" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
                         Indian Vibe Map
+                    </Link>
+                    <Link href="/messages" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
+                        Messages
                     </Link>
 
                     {!loading && !isAuthPage && (

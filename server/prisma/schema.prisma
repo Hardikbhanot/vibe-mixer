@@ -37,6 +37,22 @@ model User {
   matchesAsB    Match[]        @relation("UserMatchesB")
   likes         Like[]
   awards        Award[]
+  
+  // Messaging
+  messagesSent     Message[]   @relation("SentMessages")
+  messagesReceived Message[]   @relation("ReceivedMessages")
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  content   String
+  senderId  String
+  receiverId String
+  createdAt DateTime @default(now())
+  isRead    Boolean  @default(false)
+
+  sender    User     @relation("SentMessages", fields: [senderId], references: [id])
+  receiver  User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
 }
 
 model Match {

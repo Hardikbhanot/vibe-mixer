@@ -15,6 +15,7 @@ import userRoutes from './routes/user.js';
 import playlistRoutes from './routes/playlists.js';
 import matchRoutes from './routes/match.js';
 import adminRoutes from './routes/admin.js';
+import messageRoutes from './routes/messages.js';
 
 
 const app = express();
@@ -39,8 +40,8 @@ app.use(express.json({ limit: '50mb' }));
 // Debug Middleware for Cookies
 app.use((req, res, next) => {
   console.log(`[Request] ${req.method} ${req.url}`);
-  console.log(' - Origin:', req.headers.origin);
-  console.log(' - Cookies:', req.cookies);
+  // console.log(' - Origin:', req.headers.origin); // Reduce spam
+  // console.log(' - Cookies:', req.cookies);
   next();
 });
 
@@ -52,8 +53,9 @@ app.use('/youtube', youtubeRoutes);
 app.use('/api/swipe', swipeRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/playlists', playlistRoutes);
-app.use('/api/match', matchRoutes); // New Route
+app.use('/api/match', matchRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/messages', messageRoutes);
 
 app.get("/", (req, res) => {
   res.send("Backend is running!");
