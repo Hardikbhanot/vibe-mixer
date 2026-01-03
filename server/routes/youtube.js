@@ -123,7 +123,15 @@ router.post('/playlist', initYoutubeClient, async (req, res) => {
 
     } catch (error) {
         console.error('YouTube API Error:', error);
-        res.status(500).json({ error: 'Failed to create YouTube playlist' });
+        // Extract meaningful error message from Google API response
+        const errorDetails = error.response?.data?.error?.message || error.message;
+        const reason = error.response?.data?.error?.errors?.[0]?.reason || 'Unknown';
+
+        res.status(500).json({
+            error: 'Failed to create YouTube playlist',
+            details: errorDetails,
+            reason: reason
+        });
     }
 });
 

@@ -64,14 +64,17 @@ export default function IndiaVibePage() {
                 return;
             }
 
-            if (!response.ok) throw new Error('Failed to create playlist');
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.details || errData.error || 'Failed to create playlist');
+            }
 
             const result = await response.json();
             alert('Playlist created successfully! Check your YouTube account.');
             window.open(result.playlistUrl, '_blank');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating playlist:', error);
-            alert('Failed to create playlist.');
+            alert(`Failed: ${error.message}`);
         } finally {
             setCreatingPlaylist(false);
         }
