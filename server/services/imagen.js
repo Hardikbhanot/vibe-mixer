@@ -5,6 +5,13 @@ export const generateImage = async (prompt) => {
         const cleanPrompt = encodeURIComponent(prompt.trim().slice(0, 100)); // Limit length for URL safety
         // Using Pollinations.ai with 'flux' model for better quality
         const apiKey = process.env.POLLINATIONS_AI_API_KEY ? `&api_key=${process.env.POLLINATIONS_AI_API_KEY}` : '';
+
+        if (!process.env.POLLINATIONS_AI_API_KEY) {
+            console.warn('[Imagen] Warning: No POLLINATIONS_AI_API_KEY found. You may hit rate limits.');
+        } else {
+            console.log('[Imagen] using authenticated API key.');
+        }
+
         const imageUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=512&height=512&nologo=true&model=flux&seed=${Math.floor(Math.random() * 1000)}${apiKey}`;
         return imageUrl;
     } catch (error) {
