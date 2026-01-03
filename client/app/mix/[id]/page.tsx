@@ -148,6 +148,71 @@ export default function PublicMixPage() {
         }
     };
 
+    const [isSavingLibrary, setIsSavingLibrary] = useState(false);
+    const [hasSaved, setHasSaved] = useState(false);
+    const [saveCount, setSaveCount] = useState(0);
+
+    // Update useEffect to set initial save count
+    useEffect(() => {
+        if (playlist) {
+            setSaveCount((playlist as any).saveCount || 0);
+        }
+    }, [playlist]);
+
+    const handleSaveToLibrary = async () => {
+        if (!playlist || isSavingLibrary || hasSaved) return;
+        setIsSavingLibrary(true);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+
+        try {
+            // 1. Create a copy in user's library
+            const res = await fetch(`${apiUrl}/api/playlists`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: playlist.name, // Keep original name
+                    description: `Saved from @${playlist.user.username}: ${playlist.description || ''}`,
+                    coverImage: playlist.coverImage,
+                    mood: playlist.mood,
+                    tracks: playlist.tracks,
+                    isPublic: false // Private by default
+                }),
+                credentials: 'include'
+            });
+
+            if (res.status === 401) {
+                toast.error("Login to save mixes!");
+                return;
+            }
+
+            if (res.ok) {
+                // 2. Increment Save Count on Original
+                await fetch(`${apiUrl}/api/playlists/${playlist.id}/save-count`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+
+                setHasSaved(true);
+                setSaveCount(prev => prev + 1);
+                toast.success("Saved to your library!");
+            } else {
+                const errData = await res.json();
+                // Handle duplicate detection gracefully
+                if (errData.playlist) {
+                    toast.info("You already have this mix!");
+                    setHasSaved(true);
+                } else {
+                    throw new Error("Failed to save");
+                }
+            }
+        } catch (error) {
+            console.error('Save library error:', error);
+            toast.error("Couldn't save mix");
+        } finally {
+            setIsSavingLibrary(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-background-light dark:bg-background-dark flex flex-col font-display text-foreground">
@@ -240,11 +305,15 @@ export default function PublicMixPage() {
                                 {likeCount}
                             </button>
 
-                            {/* Save Count Display */}
-                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-light dark:bg-surface-dark text-muted-foreground text-sm font-bold">
-                                <span className="material-symbols-outlined text-[18px]">bookmark</span>
-                                {(playlist as any).saveCount || 0}
-                            </div>
+                            {/* Save to Library Button */}
+                            <button
+                                onClick={handleSaveToLibrary}
+                                disabled={isSavingLibrary}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-light dark:bg-surface-dark hover:bg-foreground/5 text-muted-foreground text-sm font-bold transition-all"
+                            >
+                                <span className={`material-symbols-outlined text-[18px] ${hasSaved ? 'fill-current text-primary' : ''}`}>bookmark</span>
+                                {saveCount}
+                            </button>
 
                             <button
                                 onClick={handleSaveToSpotify}
