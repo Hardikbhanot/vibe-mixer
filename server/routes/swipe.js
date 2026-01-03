@@ -29,25 +29,30 @@ router.get('/feed', authenticateToken, initSpotifyApi, async (req, res) => {
         // 2. Search Spotify for a Mix
         // We'll search for a few different vibes to create a mix
         const queries = [
-            'genre:pop', // English Pop
+            'genre:pop',
             'genre:indie',
-            'hindi top 50', // Hindi
+            'genre:r-n-b',
+            'genre:rock',
+            'hindi new',
             'bollywood',
-            'punjabi',
-            'lofi'
+            'punjabi hits',
+            'lofi beats',
+            'viral hits',
+            'trending india'
         ];
 
-        // Shuffle queries and pick 3
-        const selectedQueries = queries.sort(() => 0.5 - Math.random()).slice(0, 3);
+        // Shuffle queries and pick 4
+        const selectedQueries = queries.sort(() => 0.5 - Math.random()).slice(0, 4);
 
         let candidates = [];
 
         for (const q of selectedQueries) {
             try {
                 // Determine if this is likely a Hindi query for market targeting
-                const market = (q.includes('hindi') || q.includes('bollywood') || q.includes('punjabi')) ? 'IN' : 'US';
-                const limit = 15;
-                const offset = Math.floor(Math.random() * 50); // Random offset for variety
+                const market = (q.includes('hindi') || q.includes('bollywood') || q.includes('punjabi') || q.includes('india')) ? 'IN' : 'US';
+                const limit = 20;
+                // Increase offset range for more variety (avoid repeats)
+                const offset = Math.floor(Math.random() * 500);
 
                 const results = await req.spotifyApi.searchTracks(q, { limit, offset, market });
                 if (results.body.tracks) {
