@@ -162,4 +162,25 @@ router.get('/public/:username', async (req, res) => {
     }
 });
 
+// Get User Basic Details by ID (for messaging)
+router.get('/details/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const user = await prisma.user.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                username: true,
+                avatarUrl: true
+            }
+        });
+
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        res.json({ user });
+    } catch (error) {
+        console.error('Fetch details error:', error);
+        res.status(500).json({ error: 'Failed to fetch user' });
+    }
+});
+
 export default router;

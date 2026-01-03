@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '../../components/Header';
 import ChatInterface from './chat-interface';
 import { MessageSquare, Search, User, ChevronRight } from 'lucide-react';
@@ -14,6 +14,8 @@ export default function MessagesPage() {
     const [conversations, setConversations] = useState<any[]>([]);
     const [selectedChat, setSelectedChat] = useState<any>(null);
     const [isLoadingList, setIsLoadingList] = useState(true);
+    const searchParams = useSearchParams();
+    const targetUserId = searchParams.get('userId');
 
     useEffect(() => {
         if (!loading && !user) {
@@ -26,9 +28,45 @@ export default function MessagesPage() {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
             const res = await fetch(`${apiUrl}/api/messages/conversations`, { credentials: 'include' });
             const data = await res.json();
+
+            let convos = [];
             if (data.conversations) {
-                setConversations(data.conversations);
+                convos = data.conversations;
             }
+
+            // check if we need to insert the target user (if not already in list)
+            if (targetUserId) {
+                const existing = convos.find((c: any) => c.user.id === targetUserId);
+                if (existing) {
+                    setSelectedChat(existing.user);
+                } else {
+                    // Fetch details and add temp
+                    try {
+                        const userRes = await fetch(`${apiUrl}/api/user/details/${targetUserId}`);
+                        if (userRes.ok) {
+                            const userData = await userRes.json();
+                            const newUser = userData.user;
+
+                            // Mock a conversation item
+                            const newConvo = {
+                                user: newUser,
+                                lastMessage: 'Start a conversation!',
+                                timestamp: new Date().toISOString(),
+                                unread: 0
+                            };
+
+                            // Add to top
+                            convos = [newConvo, ...convos];
+                            setSelectedChat(newUser);
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch target user', e);
+                    }
+                }
+            }
+
+            setConversations(convos);
+
         } catch (error) {
             console.error('Error fetching conversations', error);
         } finally {
@@ -40,7 +78,7 @@ export default function MessagesPage() {
         if (user) {
             fetchConversations();
         }
-    }, [user]);
+    }, [user, targetUserId]);
 
     if (loading || !user) return null;
 

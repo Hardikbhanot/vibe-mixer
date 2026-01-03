@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Header } from '@/components/Header';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -18,6 +18,7 @@ interface PublicUser {
 
 export default function PublicProfilePage() {
     const params = useParams();
+    const router = useRouter();
     const username = params.username as string;
 
     const [user, setUser] = useState<PublicUser | null>(null);
@@ -125,6 +126,14 @@ export default function PublicProfilePage() {
                                 <span className="block text-2xl font-bold">{user.playlists?.length || 0}</span>
                                 <span className="text-xs text-muted-foreground uppercase tracking-wider">Public Mixes</span>
                             </div>
+
+                            <button
+                                onClick={() => router.push(`/messages?userId=${user.id}`)}
+                                className="w-full py-2 bg-primary text-black font-bold rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <span className="material-symbols-outlined text-lg">mail</span>
+                                Message
+                            </button>
                         </div>
                     </div>
                 </div>
