@@ -260,148 +260,153 @@ router.get('/login', (req, res) => {
 
 // Callback route
 router.get('/callback', async (req, res) => {
+    console.log('!!! SPOTIFY CALLBACK HIT !!!');
     const { code } = req.query;
 
     try {
-        console.log('[Spotify Callback] Code received. Exchanging for token...');
-        const data = await spotifyApi.authorizationCodeGrant(code);
-        const { access_token, refresh_token, expires_in } = data.body;
+        // ...
+        router.get('/google/callback', async (req, res) => {
+            console.log('!!! GOOGLE CALLBACK HIT !!!');
+            const code = req.query.code || null;
+            console.log('[Spotify Callback] Code received. Exchanging for token...');
+            const data = await spotifyApi.authorizationCodeGrant(code);
+            const { access_token, refresh_token, expires_in } = data.body;
 
-        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
-        console.log('[Spotify Callback] Success via Spotify API');
+            const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+            console.log('[Spotify Callback] Success via Spotify API');
 
-        // Fetch User Profile from Spotify to link/create account
-        spotifyApi.setAccessToken(access_token);
-        const me = await spotifyApi.getMe();
-        const spotifyEmail = me.body.email;
-        const spotifyId = me.body.id;
+            // Fetch User Profile from Spotify to link/create account
+            spotifyApi.setAccessToken(access_token);
+            const me = await spotifyApi.getMe();
+            const spotifyEmail = me.body.email;
+            const spotifyId = me.body.id;
 
-        console.log(`[Spotify Auth] Linked to Spotify User: ${spotifyEmail} (${spotifyId})`);
+            console.log(`[Spotify Auth] Linked to Spotify User: ${spotifyEmail} (${spotifyId})`);
 
-        if (!spotifyEmail) {
-            throw new Error('Spotify did not return an email address');
-        }
-
-        // --- Fetch Vibe Data (Top Artists/Tracks) ---
-        let topArtistsData = [];
-        let topTracksData = [];
-
-        try {
-            const topArtists = await spotifyApi.getMyTopArtists({ limit: 20, time_range: 'medium_term' });
-            topArtistsData = topArtists.body.items.map(artist => ({
-                id: artist.id,
-                name: artist.name,
-                image: artist.images[0]?.url,
-                genres: artist.genres
-            }));
-
-            const topTracks = await spotifyApi.getMyTopTracks({ limit: 20, time_range: 'medium_term' });
-            topTracksData = topTracks.body.items.map(track => ({
-                id: track.id,
-                name: track.name,
-                artist: track.artists[0].name,
-                album: track.album.name,
-                image: track.album.images[0]?.url
-            }));
-            console.log(`[Spotify Auth] Fetched ${topArtistsData.length} artists and ${topTracksData.length} tracks.`);
-        } catch (dataErr) {
-            console.error('[Spotify Auth] Failed to fetch top data:', dataErr);
-            // Non-blocking, continue login
-        }
-
-        // Find or Create User & Update Vibe Data
-        let user = await prisma.user.findUnique({ where: { email: spotifyEmail } });
-
-        if (!user) {
-            console.log('[Spotify Auth] Creating new user from Spotify...');
-            const placeholderPassword = await bcrypt.hash(`spotify_${spotifyId}_${Date.now()}`, 10);
-            user = await prisma.user.create({
-                data: {
-                    email: spotifyEmail,
-                    password_hash: placeholderPassword,
-                    topArtists: topArtistsData,
-                    topTracks: topTracksData
-                }
-            });
-        } else {
-            console.log('[Spotify Auth] Updating existing user vibe data...');
-            user = await prisma.user.update({
-                where: { email: spotifyEmail },
-                data: {
-                    topArtists: topArtistsData,
-                    topTracks: topTracksData
-                }
-            });
-        }
-
-        // Generate App Session Token
-        const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
-
-        const isProduction = process.env.NODE_ENV === 'production';
-
-        const domain = isProduction ? '.vibemixer.hbhanot.tech' : undefined;
-
-        // Set Auth Token Cookie (Critical for app login)
-        res.cookie('auth_token', token, {
-            httpOnly: true,
-            secure: isProduction ? true : false, // Secure only in prod
-            maxAge: 30 * 24 * 60 * 60 * 1000,
-            path: '/',
-            sameSite: isProduction ? 'none' : 'lax', // None requires Secure
-            domain: domain
-        });
-
-        // Set Spotify tokens in cookies
-        res.cookie('spotify_access_token', access_token, {
-            httpOnly: true,
-            secure: isProduction ? true : false,
-            maxAge: expires_in * 1000,
-            path: '/',
-            sameSite: isProduction ? 'none' : 'lax',
-            domain: domain
-        });
-
-        res.cookie('spotify_refresh_token', refresh_token, {
-            httpOnly: true,
-            secure: isProduction ? true : false,
-            path: '/',
-            sameSite: isProduction ? 'none' : 'lax',
-            domain: domain
-        });
-
-        // Redirect based on platform
-        console.log('[Spotify Auth] Callback State (Raw):', req.query.state);
-
-        if (req.query.state) {
-            try {
-                const stateStr = Buffer.from(req.query.state, 'base64').toString();
-                console.log('[Spotify Auth] Decoded State String:', stateStr);
-
-                const stateData = JSON.parse(stateStr);
-                console.log('[Spotify Auth] Parsed State Data:', stateData);
-                console.log('[Spotify Auth] Platform Check:', stateData.platform, '=== mobile?', stateData.platform === 'mobile');
-
-                if (stateData.platform === 'mobile') {
-                    console.log('[Spotify Auth] Redirecting to Mobile App Scheme (vibemixer://)...');
-                    const mobileRedirectUrl = `vibemixer://auth-callback?spotify_access_token=${access_token}&spotify_refresh_token=${refresh_token}`;
-                    return res.redirect(mobileRedirectUrl);
-                }
-            } catch (e) {
-                console.error('[Spotify Auth] Failed to parse state:', e, 'Raw:', req.query.state);
+            if (!spotifyEmail) {
+                throw new Error('Spotify did not return an email address');
             }
-        } else {
-            console.log('[Spotify Auth] No state parameter found in callback query.');
-        }
 
-        // Default Web Redirect
-        console.log('[Spotify Auth] Fallback: Defaulting to Web Redirect (CLIENT_URL).');
-        res.redirect(`${clientUrl}/generate`);
-    } catch (error) {
-        console.error('Error during Spotify authentication:', error);
-        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
-        res.redirect(`${clientUrl}/?error=auth_failed`);
-    }
-});
+            // --- Fetch Vibe Data (Top Artists/Tracks) ---
+            let topArtistsData = [];
+            let topTracksData = [];
+
+            try {
+                const topArtists = await spotifyApi.getMyTopArtists({ limit: 20, time_range: 'medium_term' });
+                topArtistsData = topArtists.body.items.map(artist => ({
+                    id: artist.id,
+                    name: artist.name,
+                    image: artist.images[0]?.url,
+                    genres: artist.genres
+                }));
+
+                const topTracks = await spotifyApi.getMyTopTracks({ limit: 20, time_range: 'medium_term' });
+                topTracksData = topTracks.body.items.map(track => ({
+                    id: track.id,
+                    name: track.name,
+                    artist: track.artists[0].name,
+                    album: track.album.name,
+                    image: track.album.images[0]?.url
+                }));
+                console.log(`[Spotify Auth] Fetched ${topArtistsData.length} artists and ${topTracksData.length} tracks.`);
+            } catch (dataErr) {
+                console.error('[Spotify Auth] Failed to fetch top data:', dataErr);
+                // Non-blocking, continue login
+            }
+
+            // Find or Create User & Update Vibe Data
+            let user = await prisma.user.findUnique({ where: { email: spotifyEmail } });
+
+            if (!user) {
+                console.log('[Spotify Auth] Creating new user from Spotify...');
+                const placeholderPassword = await bcrypt.hash(`spotify_${spotifyId}_${Date.now()}`, 10);
+                user = await prisma.user.create({
+                    data: {
+                        email: spotifyEmail,
+                        password_hash: placeholderPassword,
+                        topArtists: topArtistsData,
+                        topTracks: topTracksData
+                    }
+                });
+            } else {
+                console.log('[Spotify Auth] Updating existing user vibe data...');
+                user = await prisma.user.update({
+                    where: { email: spotifyEmail },
+                    data: {
+                        topArtists: topArtistsData,
+                        topTracks: topTracksData
+                    }
+                });
+            }
+
+            // Generate App Session Token
+            const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
+
+            const isProduction = process.env.NODE_ENV === 'production';
+
+            const domain = isProduction ? '.vibemixer.hbhanot.tech' : undefined;
+
+            // Set Auth Token Cookie (Critical for app login)
+            res.cookie('auth_token', token, {
+                httpOnly: true,
+                secure: isProduction ? true : false, // Secure only in prod
+                maxAge: 30 * 24 * 60 * 60 * 1000,
+                path: '/',
+                sameSite: isProduction ? 'none' : 'lax', // None requires Secure
+                domain: domain
+            });
+
+            // Set Spotify tokens in cookies
+            res.cookie('spotify_access_token', access_token, {
+                httpOnly: true,
+                secure: isProduction ? true : false,
+                maxAge: expires_in * 1000,
+                path: '/',
+                sameSite: isProduction ? 'none' : 'lax',
+                domain: domain
+            });
+
+            res.cookie('spotify_refresh_token', refresh_token, {
+                httpOnly: true,
+                secure: isProduction ? true : false,
+                path: '/',
+                sameSite: isProduction ? 'none' : 'lax',
+                domain: domain
+            });
+
+            // Redirect based on platform
+            console.log('[Spotify Auth] Callback State (Raw):', req.query.state);
+
+            if (req.query.state) {
+                try {
+                    const stateStr = Buffer.from(req.query.state, 'base64').toString();
+                    console.log('[Spotify Auth] Decoded State String:', stateStr);
+
+                    const stateData = JSON.parse(stateStr);
+                    console.log('[Spotify Auth] Parsed State Data:', stateData);
+                    console.log('[Spotify Auth] Platform Check:', stateData.platform, '=== mobile?', stateData.platform === 'mobile');
+
+                    if (stateData.platform === 'mobile') {
+                        console.log('[Spotify Auth] Redirecting to Mobile App Scheme (vibemixer://)...');
+                        const mobileRedirectUrl = `vibemixer://auth-callback?spotify_access_token=${access_token}&spotify_refresh_token=${refresh_token}`;
+                        return res.redirect(mobileRedirectUrl);
+                    }
+                } catch (e) {
+                    console.error('[Spotify Auth] Failed to parse state:', e, 'Raw:', req.query.state);
+                }
+            } else {
+                console.log('[Spotify Auth] No state parameter found in callback query.');
+            }
+
+            // Default Web Redirect
+            console.log('[Spotify Auth] Fallback: Defaulting to Web Redirect (CLIENT_URL).');
+            res.redirect(`${clientUrl}/generate`);
+        } catch (error) {
+            console.error('Error during Spotify authentication:', error);
+            const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+            res.redirect(`${clientUrl}/?error=auth_failed`);
+        }
+    });
 
 // --- Google / YouTube Auth ---
 
