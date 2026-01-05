@@ -173,7 +173,7 @@ router.post('/register', async (req, res) => {
             domain: domain
         });
 
-        res.status(201).json({ message: 'User created successfully', user: { id: user.id, email: user.email } });
+        res.status(201).json({ message: 'User created successfully', user: { id: user.id, email: user.email }, token });
 
     } catch (error) {
         console.error('Registration error:', error);
@@ -210,7 +210,7 @@ router.post('/login', async (req, res) => {
             domain: domain
         });
 
-        res.json({ message: 'Login successful', user: { id: user.id, email: user.email } });
+        res.json({ message: 'Login successful', user: { id: user.id, email: user.email }, token });
 
     } catch (error) {
         console.error('Login error:', error);
@@ -246,8 +246,15 @@ router.post('/logout', (req, res) => {
 
 // Route to initiate login
 router.get('/login', (req, res) => {
-    console.log('[Spotify Auth] Redirect URI:', process.env.SPOTIFY_REDIRECT_URI);
-    const authorizeURL = spotifyApi.createAuthorizeURL(scopes);
+    console.log('[Spotify Auth] /login called.');
+    console.log('[Spotify Auth] Query Params:', req.query);
+    const platform = req.query.platform || 'web';
+    console.log(`[Spotify Auth] Initiating for Platform: ${platform}`);
+
+    const state = Buffer.from(JSON.stringify({ platform })).toString('base64');
+    console.log('[Spotify Auth] Generated State:', state);
+
+    const authorizeURL = spotifyApi.createAuthorizeURL(scopes, state);
     res.redirect(authorizeURL);
 });
 
@@ -362,7 +369,31 @@ router.get('/callback', async (req, res) => {
             domain: domain
         });
 
-        // Redirect back to frontend
+        // Redirect based on platform
+        console.log('[Spotify Auth] Callback State:', req.query.state);
+
+        if (req.query.state) {
+            try {
+                const stateStr = Buffer.from(req.query.state, 'base64').toString();
+                console.log('[Spotify Auth] Decoded State String:', stateStr);
+                const stateData = JSON.parse(stateStr);
+
+                console.log('[Spotify Auth] Parsed Platform:', stateData.platform);
+
+                if (stateData.platform === 'mobile') {
+                    console.log('[Spotify Auth] Redirecting to Mobile App...');
+                    const mobileRedirectUrl = `vibemixer://auth-callback?spotify_access_token=${access_token}&spotify_refresh_token=${refresh_token}`;
+                    return res.redirect(mobileRedirectUrl);
+                }
+            } catch (e) {
+                console.error('[Spotify Auth] Failed to parse state:', e, 'Raw:', req.query.state);
+            }
+        } else {
+            console.log('[Spotify Auth] No state parameter found.');
+        }
+
+        // Default Web Redirect
+        console.log('[Spotify Auth] Defaulting to Web Redirect.');
         res.redirect(`${clientUrl}/generate`);
     } catch (error) {
         console.error('Error during Spotify authentication:', error);
@@ -392,7 +423,10 @@ router.get('/google', (req, res) => {
         'https://www.googleapis.com/auth/userinfo.email'
     ];
 
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes.join(' '))}&access_type=offline&prompt=consent`;
+    const platform = req.query.platform || 'web';
+    const state = Buffer.from(JSON.stringify({ platform })).toString('base64');
+
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes.join(' '))}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
 
     console.log('[Google Auth] Generated URL:', url);
 
@@ -496,7 +530,21 @@ router.get('/google/callback', async (req, res) => {
             });
         }
 
-        // Redirect back to frontend
+        // Redirect based on platform
+        if (req.query.state) {
+            try {
+                const stateData = JSON.parse(Buffer.from(req.query.state, 'base64').toString());
+                if (stateData.platform === 'mobile') {
+                    console.log('[Google Auth] Redirecting to Mobile App...');
+                    const mobileRedirectUrl = `vibemixer://auth-callback?google_access_token=${access_token}&google_refresh_token=${refresh_token || ''}`;
+                    return res.redirect(mobileRedirectUrl);
+                }
+            } catch (e) {
+                console.error('[Google Auth] Failed to parse state:', e, 'Raw State:', req.query.state);
+            }
+        }
+
+        // Web Redirect
         const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
         res.redirect(`${clientUrl}/generate`);
 

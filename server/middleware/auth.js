@@ -3,7 +3,12 @@ import jwt from 'jsonwebtoken';
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-change-in-prod';
 
 export const authenticateToken = (req, res, next) => {
-    const token = req.cookies.auth_token;
+    let token = req.cookies.auth_token;
+
+    // Check Authorization Header (Bearer Token)
+    if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+        token = req.headers.authorization.split(' ')[1];
+    }
 
     if (!token) {
         return res.status(401).json({ error: 'Access denied: No token provided' });

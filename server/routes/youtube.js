@@ -7,8 +7,9 @@ const router = express.Router();
 // Middleware to initialize YouTube API client
 const initYoutubeClient = async (req, res, next) => {
     console.log('[YouTube Auth] Checking tokens...');
-    let accessToken = req.cookies.google_access_token;
-    const refreshToken = req.cookies.google_refresh_token;
+    // Check Cookies OR Headers (for Mobile)
+    let accessToken = req.cookies.google_access_token || req.headers['x-google-token'];
+    const refreshToken = req.cookies.google_refresh_token || req.headers['x-google-refresh-token'];
 
     const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,

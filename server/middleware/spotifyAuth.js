@@ -5,10 +5,10 @@ dotenv.config();
 
 export const initSpotifyApi = async (req, res, next) => {
     console.log(`[Auth Middleware] Processing request for ${req.path}`);
-    console.log('[Auth Middleware] Cookies:', req.cookies);
 
-    let accessToken = req.cookies.spotify_access_token;
-    const refreshToken = req.cookies.spotify_refresh_token;
+    // Check Cookies OR Headers (for Mobile)
+    let accessToken = req.cookies.spotify_access_token || req.headers['x-spotify-token'];
+    const refreshToken = req.cookies.spotify_refresh_token || req.headers['x-spotify-refresh-token'];
 
     const spotifyApi = new SpotifyWebApi({
         clientId: process.env.SPOTIFY_CLIENT_ID,
