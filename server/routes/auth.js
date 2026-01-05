@@ -370,18 +370,19 @@ router.get('/callback', async (req, res) => {
         });
 
         // Redirect based on platform
-        console.log('[Spotify Auth] Callback State:', req.query.state);
+        console.log('[Spotify Auth] Callback State (Raw):', req.query.state);
 
         if (req.query.state) {
             try {
                 const stateStr = Buffer.from(req.query.state, 'base64').toString();
                 console.log('[Spotify Auth] Decoded State String:', stateStr);
-                const stateData = JSON.parse(stateStr);
 
-                console.log('[Spotify Auth] Parsed Platform:', stateData.platform);
+                const stateData = JSON.parse(stateStr);
+                console.log('[Spotify Auth] Parsed State Data:', stateData);
+                console.log('[Spotify Auth] Platform Check:', stateData.platform, '=== mobile?', stateData.platform === 'mobile');
 
                 if (stateData.platform === 'mobile') {
-                    console.log('[Spotify Auth] Redirecting to Mobile App...');
+                    console.log('[Spotify Auth] Redirecting to Mobile App Scheme (vibemixer://)...');
                     const mobileRedirectUrl = `vibemixer://auth-callback?spotify_access_token=${access_token}&spotify_refresh_token=${refresh_token}`;
                     return res.redirect(mobileRedirectUrl);
                 }
@@ -389,11 +390,11 @@ router.get('/callback', async (req, res) => {
                 console.error('[Spotify Auth] Failed to parse state:', e, 'Raw:', req.query.state);
             }
         } else {
-            console.log('[Spotify Auth] No state parameter found.');
+            console.log('[Spotify Auth] No state parameter found in callback query.');
         }
 
         // Default Web Redirect
-        console.log('[Spotify Auth] Defaulting to Web Redirect.');
+        console.log('[Spotify Auth] Fallback: Defaulting to Web Redirect (CLIENT_URL).');
         res.redirect(`${clientUrl}/generate`);
     } catch (error) {
         console.error('Error during Spotify authentication:', error);
@@ -531,20 +532,31 @@ router.get('/google/callback', async (req, res) => {
         }
 
         // Redirect based on platform
+        console.log('[Google Auth] Callback State (Raw):', req.query.state);
+
         if (req.query.state) {
             try {
-                const stateData = JSON.parse(Buffer.from(req.query.state, 'base64').toString());
+                const stateStr = Buffer.from(req.query.state, 'base64').toString();
+                console.log('[Google Auth] Decoded State String:', stateStr);
+
+                const stateData = JSON.parse(stateStr);
+                console.log('[Google Auth] Parsed State Data:', stateData);
+                console.log('[Google Auth] Platform Check:', stateData.platform, '=== mobile?', stateData.platform === 'mobile');
+
                 if (stateData.platform === 'mobile') {
-                    console.log('[Google Auth] Redirecting to Mobile App...');
+                    console.log('[Google Auth] Redirecting to Mobile App Scheme (vibemixer://)...');
                     const mobileRedirectUrl = `vibemixer://auth-callback?google_access_token=${access_token}&google_refresh_token=${refresh_token || ''}`;
                     return res.redirect(mobileRedirectUrl);
                 }
             } catch (e) {
                 console.error('[Google Auth] Failed to parse state:', e, 'Raw State:', req.query.state);
             }
+        } else {
+            console.log('[Google Auth] No state parameter found in callback query.');
         }
 
         // Web Redirect
+        console.log('[Google Auth] Fallback: Defaulting to Web Redirect.');
         const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
         res.redirect(`${clientUrl}/generate`);
 
