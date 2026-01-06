@@ -54,10 +54,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     const res = await api.get('/auth/me');
                     if (res && res.user) {
                         setUser(res.user);
+
+                        // Check Linked Accounts
+                        const sToken = await Store.getItemAsync('spotify_access_token');
+                        const gToken = await Store.getItemAsync('google_access_token');
+                        setSpotifyLinked(!!sToken);
+                        setGoogleLinked(!!gToken);
                     } else {
                         // Token invalid/expired
                         await Store.deleteItemAsync('auth_token');
                         setUser(null);
+                        setSpotifyLinked(false);
+                        setGoogleLinked(false);
                     }
                 }
             } catch (e) {
@@ -88,12 +96,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
             if (queryParams.spotify_access_token) {
                 await Store.setItemAsync('spotify_access_token', queryParams.spotify_access_token as string);
+                setSpotifyLinked(true);
             }
             if (queryParams.spotify_refresh_token) {
                 await Store.setItemAsync('spotify_refresh_token', queryParams.spotify_refresh_token as string);
             }
             if (queryParams.google_access_token) {
                 await Store.setItemAsync('google_access_token', queryParams.google_access_token as string);
+                setGoogleLinked(true);
             }
             if (queryParams.google_refresh_token) {
                 await Store.setItemAsync('google_refresh_token', queryParams.google_refresh_token as string);

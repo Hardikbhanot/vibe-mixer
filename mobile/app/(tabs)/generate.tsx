@@ -9,6 +9,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { api } from '@/constants/api';
 import { useRouter } from 'expo-router';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import * as ImagePicker from 'expo-image-picker';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,6 +29,10 @@ export default function GenerateScreen() {
     const [mood, setMood] = useState('');
     const [isAdvanced, setIsAdvanced] = useState(false);
 
+    // Image Upload State
+    const [imageUri, setImageUri] = useState<string | null>(null);
+    const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+
     // Loading State
     const [generating, setGenerating] = useState(false);
 
@@ -41,6 +47,51 @@ export default function GenerateScreen() {
     // Model Selection
     const [selectedModel, setSelectedModel] = useState(AI_MODELS[1]); // Default to GPT-OSS
     const [modalVisible, setModalVisible] = useState(false);
+
+    const pickImage = async () => {
+        // Request permissions
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission needed', 'Sorry, we need camera roll permissions to make this happen!');
+            return;
+        }
+
+        let result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1], // Square aspect ratio often better for covers
+            quality: 0.5, // Compress a bit
+        });
+
+        if (!result.canceled) {
+            setImageUri(result.assets[0].uri);
+            analyzeImage(result.assets[0]);
+        }
+    };
+
+    const analyzeImage = async (asset: any) => {
+        setIsAnalyzingImage(true);
+        try {
+            const formData = new FormData();
+            formData.append('image', {
+                uri: asset.uri,
+                name: 'upload.jpg',
+                type: 'image/jpeg',
+            } as any);
+
+            const res = await api.upload('/ai/analyze-image', formData);
+            if (res && res.mood) {
+                setMood(res.mood);
+            } else {
+                Alert.alert("Analyze Failed", "Could not understand the image vibe.");
+            }
+        } catch (e) {
+            Alert.alert("Error", "Network error during analysis.");
+        } finally {
+            setIsAnalyzingImage(false);
+        }
+    };
+
 
     const handleGenerate = async () => {
         if (!mood.trim()) {
@@ -64,14 +115,23 @@ export default function GenerateScreen() {
             if (res.error) {
                 Alert.alert("Error", res.message || "Failed to generate vibe. Try again.");
             } else {
-                // Generate Pollinations Image
-                const pollPrompt = encodeURIComponent(`${mood} abstract album cover art high quality 4k`);
-                const pollImage = `https://image.pollinations.ai/prompt/${pollPrompt}`;
+                // Generate Pollinations Image if no user image, else use uploaded? 
+                // Actually the backend endpoint returns a generated cover usually.
+                // But let's mirror the logic: If user uploaded image, we might want to use that as cover?
+                // For now, let's stick to the generated prompt or Pollinations.
+
+                let coverImage = null;
+                if (imageUri) {
+                    coverImage = imageUri; // Use the user's uploaded image locally
+                } else {
+                    const pollPrompt = encodeURIComponent(`${mood} abstract album cover art high quality 4k`);
+                    coverImage = `https://image.pollinations.ai/prompt/${pollPrompt}`;
+                }
 
                 // Navigate to the playlist page with data
                 router.push({
                     pathname: '/generated-playlist',
-                    params: { data: JSON.stringify({ ...res, coverImage: pollImage }) }
+                    params: { data: JSON.stringify({ ...res, coverImage }) }
                 });
             }
         } catch (e) {
@@ -95,31 +155,44 @@ export default function GenerateScreen() {
             <ScrollView contentContainerStyle={styles.scrollContent}>
 
                 {/* Header */}
-                <View style={styles.header}>
+                <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.header}>
                     <Text style={styles.title}>Craft Your Perfect Mix</Text>
-                </View>
+                </Animated.View>
 
                 {/* Upload Placeholder */}
-                <Text style={styles.label}>Start with a photo (Optional)</Text>
-                <TouchableOpacity style={styles.uploadBox} activeOpacity={0.8}>
-                    <FontAwesome name="image" size={24} color={theme.text} style={{ opacity: 0.7, marginBottom: 10 }} />
-                    <Text style={styles.uploadTextBold}>Click to upload <Text style={styles.uploadText}>or drag and drop</Text></Text>
-                    <Text style={styles.uploadSubText}>AI will describe the vibe for you</Text>
-                </TouchableOpacity>
+                <Animated.View entering={FadeInDown.delay(200).springify()}>
+                    <Text style={styles.label}>Start with a photo (Optional)</Text>
+                    <TouchableOpacity style={styles.uploadBox} activeOpacity={0.8} onPress={pickImage} disabled={isAnalyzingImage}>
+                        {isAnalyzingImage ? (
+                            <ActivityIndicator color="white" />
+                        ) : imageUri ? (
+                            <Image source={{ uri: imageUri }} style={styles.previewImage} />
+                        ) : (
+                            <>
+                                <FontAwesome name="image" size={24} color={theme.text} style={{ opacity: 0.7, marginBottom: 10 }} />
+                                <Text style={styles.uploadTextBold}>Click to upload <Text style={styles.uploadText}>or drag and drop</Text></Text>
+                                <Text style={styles.uploadSubText}>AI will describe the vibe for you</Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
+                    {isAnalyzingImage && <Text style={{ color: '#ccc', textAlign: 'center', marginBottom: 10, fontSize: 12 }}>Analyzing vibe...</Text>}
+                </Animated.View>
 
                 {/* Text Input */}
-                <Text style={styles.label}>Tell VibeMixer your vibe</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder="e.g., 'Rainy day coding music' or 'High-energy 90s hip-hop workout.'"
-                    placeholderTextColor="rgba(255,255,255,0.4)"
-                    value={mood}
-                    onChangeText={setMood}
-                    multiline
-                />
+                <Animated.View entering={FadeInDown.delay(300).springify()}>
+                    <Text style={styles.label}>Tell VibeMixer your vibe</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="e.g., 'Rainy day coding music' or 'High-energy 90s hip-hop workout.'"
+                        placeholderTextColor="rgba(255,255,255,0.4)"
+                        value={mood}
+                        onChangeText={setMood}
+                        multiline
+                    />
+                </Animated.View>
 
                 {/* Advanced Toggle */}
-                <View style={[styles.row, { marginVertical: 20 }]}>
+                <Animated.View entering={FadeInDown.delay(400).springify()} style={[styles.row, { marginVertical: 20 }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <View style={{ padding: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 8, marginRight: 10 }}>
                             <FontAwesome name="sliders" size={16} color="white" />
@@ -132,10 +205,10 @@ export default function GenerateScreen() {
                         trackColor={{ false: '#767577', true: theme.tint }}
                         thumbColor={'white'}
                     />
-                </View>
+                </Animated.View>
 
                 {isAdvanced && (
-                    <View>
+                    <Animated.View entering={FadeInDown.duration(300)}>
                         {/* Model Selector Trigger */}
                         <Text style={styles.label}>AI Model (Brain) 🧠</Text>
                         <TouchableOpacity style={styles.pickerContainer} onPress={() => setModalVisible(true)}>
@@ -192,31 +265,31 @@ export default function GenerateScreen() {
                                 thumbTintColor="white"
                             />
                         </View>
-
-                        {/* More Sliders (Tempo, Valence) omitted for brevity but logic is same */}
-                    </View>
+                    </Animated.View>
                 )}
 
                 {/* Generate Button */}
-                <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={styles.generateButton}
-                    onPress={handleGenerate}
-                    disabled={generating}
-                >
-                    <LinearGradient
-                        colors={generating ? ['#444', '#555'] : [theme.tint, '#A78BFA']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.gradientButton}
+                <Animated.View entering={FadeInDown.delay(500).springify()}>
+                    <TouchableOpacity
+                        activeOpacity={0.8}
+                        style={styles.generateButton}
+                        onPress={handleGenerate}
+                        disabled={generating || isAnalyzingImage}
                     >
-                        {generating ? (
-                            <ActivityIndicator color="white" />
-                        ) : (
-                            <Text style={styles.buttonText}>Generate My Mix</Text>
-                        )}
-                    </LinearGradient>
-                </TouchableOpacity>
+                        <LinearGradient
+                            colors={generating ? ['#444', '#555'] : [theme.tint, '#A78BFA']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.gradientButton}
+                        >
+                            {generating ? (
+                                <ActivityIndicator color="white" />
+                            ) : (
+                                <Text style={styles.buttonText}>Generate My Mix</Text>
+                            )}
+                        </LinearGradient>
+                    </TouchableOpacity>
+                </Animated.View>
 
             </ScrollView>
 
@@ -294,6 +367,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 25,
         backgroundColor: 'rgba(255,255,255,0.02)',
+        overflow: 'hidden',
+    },
+    previewImage: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover'
     },
     uploadTextBold: {
         color: 'white',
@@ -334,7 +413,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#8B5CF6', // Purple Border to match screenshot
+        borderColor: '#8B5CF6',
     },
     helperText: {
         color: 'rgba(255,255,255,0.4)',
@@ -428,7 +507,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     selectedModelOption: {
-        backgroundColor: 'rgba(139, 92, 246, 0.1)', // Light purple highlight
+        backgroundColor: 'rgba(139, 92, 246, 0.1)',
         paddingHorizontal: 10,
         borderRadius: 8,
         borderBottomWidth: 0,

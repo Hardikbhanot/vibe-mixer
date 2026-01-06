@@ -3,7 +3,8 @@ import { Platform } from 'react-native';
 import * as Store from 'expo-secure-store';
 
 const LOCALHOST = Platform.OS === 'ios' ? 'http://localhost:3000' : 'http://10.0.2.2:3000';
-const LOCAL_IP = 'https://vibemixer.hbhanot.tech'; // Production Domain
+const LOCAL_IP = 'https://api.vibemixer.hbhanot.tech'; // Production Backend
+// const LOCAL_IP = 'http://192.168.1.4:4000'; // Local Development IP
 const API_URL = process.env.EXPO_PUBLIC_API_URL || LOCAL_IP;
 
 export const api = {
@@ -76,6 +77,76 @@ export const api = {
         } catch (error) {
             console.error('API POST Error:', error);
             return { error: true, message: 'Network request failed' };
+        }
+    },
+
+    async put(endpoint: string, body: any) {
+        console.log(`PUT ${API_URL}${endpoint}`, body);
+        const headers: any = { 'Content-Type': 'application/json' };
+
+        try {
+            const token = await Store.getItemAsync('auth_token');
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+        } catch (e) { console.log("Error reading tokens", e); }
+
+        try {
+            const response = await fetch(`${API_URL}${endpoint}`, {
+                method: 'PUT',
+                headers: headers,
+                credentials: 'include',
+                body: JSON.stringify(body),
+            });
+            return response.json();
+        } catch (error) {
+            console.error('API PUT Error:', error);
+            return { error: true, message: 'Network request failed' };
+        }
+    },
+
+    async delete(endpoint: string) {
+        console.log(`DELETE ${API_URL}${endpoint}`);
+        const headers: any = {};
+
+        try {
+            const token = await Store.getItemAsync('auth_token');
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+        } catch (e) { console.log("Error reading tokens", e); }
+
+        try {
+            const response = await fetch(`${API_URL}${endpoint}`, {
+                method: 'DELETE',
+                headers: headers,
+                credentials: 'include',
+            });
+            return response.json();
+        } catch (error) {
+            console.error('API DELETE Error:', error);
+            return { error: true, message: 'Network request failed' };
+        }
+    },
+
+    async upload(endpoint: string, formData: any) {
+        console.log(`UPLOAD ${API_URL}${endpoint}`);
+        const headers: any = {};
+
+        try {
+            const token = await Store.getItemAsync('auth_token');
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+        } catch (e) {
+            console.log("Error reading tokens", e);
+        }
+
+        try {
+            const response = await fetch(`${API_URL}${endpoint}`, {
+                method: 'POST',
+                headers: headers,
+                body: formData,
+                credentials: 'include',
+            });
+            return response.json();
+        } catch (error) {
+            console.error('API UPLOAD Error:', error);
+            return { error: true, message: 'Upload failed' };
         }
     }
 };

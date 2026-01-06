@@ -170,19 +170,26 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
 
 // --- 3. Image Analysis Route ---
 router.post('/analyze-image', upload.single('image'), async (req, res) => {
+    console.log('[AI] /analyze-image called');
     try {
         if (!req.file) {
+            console.error('[AI] No file received in req.file');
+            console.log('[AI] req.headers:', req.headers['content-type']);
+            // console.log('[AI] req.body (checking for misparsed fields):', req.body);
             return res.status(400).json({ error: 'No image uploaded' });
         }
+
+        console.log(`[AI] File received: ${req.file.originalname} (${req.file.mimetype}, ${req.file.size} bytes)`);
 
         const base64Image = req.file.buffer.toString('base64');
         const mimeType = req.file.mimetype; // e.g., 'image/png'
         const moodDescription = await analyzeImage(base64Image, mimeType);
 
+        console.log('[AI] Analysis success:', moodDescription);
         res.json({ mood: moodDescription });
     } catch (error) {
         console.error('Image analysis error:', error);
-        res.status(500).json({ error: 'Failed to analyze image' });
+        res.status(500).json({ error: 'Failed to analyze image', details: error.message });
     }
 });
 

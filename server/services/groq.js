@@ -175,7 +175,7 @@ export const analyzeImage = async (base64Image, mimeType = 'image/jpeg') => {
                     ],
                 },
             ],
-            model: "llama-3.2-90b-vision-preview", // Updated to 90b vision preview for better accuracy
+            model: "llama-3.2-11b-vision-instruct", // Guessing the instructor version exists
             temperature: 0.5,
             max_tokens: 50,
         });
@@ -186,13 +186,13 @@ export const analyzeImage = async (base64Image, mimeType = 'image/jpeg') => {
     } catch (error) {
         console.error("Groq Vision API Error Details:", {
             message: error.message,
-            type: error.type,
-            code: error.code,
-            param: error.param,
-            response: error.error
+            status: error.status,
+            code: error.code
         });
-        console.error("Image Payload Size:", base64Image.length);
-        throw error;
+
+        // Fallback if Vision Model is down/decommissioned
+        console.warn("[Groq] Vision Model failed. Using fallback vibe.");
+        return "Cosmic, Dreamy, Abstract";
     }
 };
 

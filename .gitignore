@@ -35,3 +35,7 @@ pnpm-debug.log*
 .vscode/
 *.swp
 *.swo
+
+# Secrets
+google-key.json
+*.jpg

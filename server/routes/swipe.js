@@ -32,33 +32,34 @@ router.get('/feed', authenticateToken, initSpotifyApi, async (req, res) => {
             seenSet.add(`${s.songName.toLowerCase()}:${s.artistName.toLowerCase()}`);
         });
 
-        // 2. Search Spotify for a Mix
-        // We'll search for a few different vibes to create a mix
-        const queries = [
-            'genre:pop',
-            'genre:indie',
-            'genre:r-n-b',
-            'genre:rock',
-            'hindi new',
-            'bollywood',
-            'punjabi hits',
-            'lofi beats',
-            'viral hits',
-            'trending india'
-        ];
+        // 2. Search Spotify for a Mix (Guaranteed Variety)
+        const categories = {
+            hindiNew: ['hindi new', 'bollywood hits', 'punjabi 2024', 'trending india', 'arijit singh'],
+            hindiOld: ['bollywood 90s', 'bollywood 2000s', 'kishore kumar', 'lat mangeshkar', 'old hindi songs'],
+            englishNew: ['genre:pop', 'viral hits', 'top 50 global', 'genre:r-n-b'],
+            englishOld: ['year:1990-2010 pop', '90s hits', 'classic rock', 'year:2000-2010']
+        };
 
-        // Shuffle queries and pick 4
-        const selectedQueries = queries.sort(() => 0.5 - Math.random()).slice(0, 4);
+        const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+        // Select one from each category to ensure the user's requested "variety"
+        const selectedQueries = [
+            pickRandom(categories.hindiNew),
+            pickRandom(categories.hindiOld),
+            pickRandom(categories.englishNew),
+            pickRandom(categories.englishOld)
+        ];
 
         let candidates = [];
 
         for (const q of selectedQueries) {
             try {
                 // Determine if this is likely a Hindi query for market targeting
-                const market = (q.includes('hindi') || q.includes('bollywood') || q.includes('punjabi') || q.includes('india')) ? 'IN' : 'US';
+                const isHindi = q.includes('hindi') || q.includes('bollywood') || q.includes('punjabi') || q.includes('india') || q.includes('kumar') || q.includes('singh');
+                const market = isHindi ? 'IN' : 'US';
                 const limit = 20;
                 // Increase offset range for more variety (avoid repeats)
-                const offset = Math.floor(Math.random() * 500);
+                const offset = Math.floor(Math.random() * 100); // Reduced offset slightly to ensure results exist
 
                 const results = await req.spotifyApi.searchTracks(q, { limit, offset, market });
                 if (results.body.tracks) {

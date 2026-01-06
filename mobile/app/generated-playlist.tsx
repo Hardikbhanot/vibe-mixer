@@ -58,11 +58,12 @@ export default function GeneratedPlaylistScreen() {
 
     const handleSave = async () => {
         try {
-            const res = await api.post('/api/playlists/save', {
+            const res = await api.post('/api/playlists', {
                 name: playlist_name,
                 description,
                 tracks: tracks,
                 mood: 'generated', // Default mood tag for now
+                coverImage: playlistData.coverImage || tracks[0]?.album?.images[0]?.url // Pass cover image
             });
 
             if (res.error) {

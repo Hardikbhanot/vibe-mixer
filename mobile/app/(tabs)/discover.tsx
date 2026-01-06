@@ -1,49 +1,44 @@
 
-import { StyleSheet, Dimensions, Image, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, Dimensions, Image, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { LinearGradient } from 'expo-linear-gradient';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useRouter } from 'expo-router';
+import { useState, useEffect } from 'react';
+import { api } from '@/constants/api';
 
 const { width } = Dimensions.get('window');
 
-const MOCK_VIBES = [
-    {
-        id: '1',
-        title: 'Whisker Waves',
-        author: '@hardik.bhanot1',
-        date: '04/01/2026',
-        description: 'A curated mix of electronic, indie, and hip-hop tracks to fuel your coding sessions with...',
-        tracks: 13,
-        type: 'Mix',
-        image: 'https://i.pinimg.com/736x/87/14/55/8714556a52021ba3a55c8e7a833a988d.jpg',
-    },
-    {
-        id: '2',
-        title: 'Washroom Serenity',
-        author: '@hardikbhanot12',
-        date: '11/12/2025',
-        description: 'A soothing blend of relaxing melodies and uplifting rhythms to accompany your washroom...',
-        tracks: 13,
-        type: 'Mix',
-        image: 'https://i.pinimg.com/736x/e4/c4/2b/e4c42b93cc521d966d482613ebdc0436.jpg',
-    },
-    {
-        id: '3',
-        title: 'Code & Chill',
-        author: '@hardik.bhanot1',
-        date: '10/12/2025',
-        description: 'A curated mix of electronic, indie, and Latin tracks to keep you focused and relaxed during...',
-        tracks: 15,
-        type: 'Mix',
-        image: 'https://i.pinimg.com/736x/21/09/21/210921a97d812678003f56d95393160a.jpg',
-    },
-];
 
 export default function DiscoverScreen() {
     const colorScheme = useColorScheme();
-    const theme = Colors['dark'];
+    const router = useRouter();
+    const [refreshing, setRefreshing] = useState(false);
+
+    useEffect(() => {
+        fetchFeed();
+    }, []);
+
+    const fetchFeed = async () => {
+        try {
+            const res = await api.get('/api/playlists/public');
+            if (res && res.playlists) {
+                setVibes(res.playlists);
+            }
+        } catch (e) {
+            console.log("Error fetching feed", e);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchFeed();
+    };
 
     return (
         <View style={styles.container}>
@@ -53,7 +48,12 @@ export default function DiscoverScreen() {
                 style={StyleSheet.absoluteFill}
             />
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B5CF6" />
+                }
+            >
 
                 {/* Header */}
                 <View style={styles.header}>
@@ -63,38 +63,67 @@ export default function DiscoverScreen() {
                     </Text>
                 </View>
 
-                {/* Grid */}
-                {MOCK_VIBES.map((vibe) => (
-                    <View key={vibe.id} style={styles.card}>
-                        <Image source={{ uri: vibe.image }} style={styles.cardImage} />
-
-                        {/* Overlay Badge */}
-                        <View style={styles.authorBadge}>
-                            <View style={styles.avatarPlaceholder}>
-                                <Text style={styles.avatarText}>{vibe.author[1].toUpperCase()}</Text>
-                            </View>
-                            <Text style={styles.authorText}>{vibe.author}</Text>
-                        </View>
-
-                        <View style={styles.cardContent}>
-                            <View style={styles.cardHeader}>
-                                <Text style={styles.cardTitle}>{vibe.title}</Text>
-                                <View style={styles.dateBadge}>
-                                    <Text style={styles.dateText}>{vibe.date}</Text>
-                                </View>
-                            </View>
-
-                            <Text style={styles.description}>{vibe.description}</Text>
-
-                            <View style={styles.cardFooter}>
-                                <View style={styles.tag}>
-                                    <Text style={styles.tagText}>{vibe.tracks} Tracks</Text>
-                                </View>
-                                <Text style={[styles.tagText, { marginLeft: 10 }]}>{vibe.type}</Text>
-                            </View>
-                        </View>
+                {loading ? (
+                    <View style={{ marginTop: 50 }}>
+                        <FontAwesome name="circle-o-notch" size={30} color="#8B5CF6" style={{ alignSelf: 'center' }} />
                     </View>
-                ))}
+                ) : (
+                    vibes.map((vibe) => (
+                        <TouchableOpacity
+                            key={vibe.id}
+                            style={styles.card}
+                            activeOpacity={0.9}
+                            onPress={() => router.push(`/playlist/${vibe.id}`)}
+                        >
+                            <Image
+                                source={{ uri: vibe.coverImage || 'https://via.placeholder.com/400' }}
+                                style={styles.cardImage}
+                            />
+
+                            {/* Overlay Badge - Clickable Author */}
+                            <TouchableOpacity
+                                style={styles.authorBadge}
+                                onPress={() => router.push(`/user/${vibe.user?.username}`)}
+                            >
+                                <View style={styles.avatarPlaceholder}>
+                                    {vibe.user?.avatarUrl ? (
+                                        <Image source={{ uri: vibe.user.avatarUrl }} style={{ width: 24, height: 24, borderRadius: 12 }} />
+                                    ) : (
+                                        <Text style={styles.avatarText}>{(vibe.user?.username?.[0] || 'U').toUpperCase()}</Text>
+                                    )}
+                                </View>
+                                <Text style={styles.authorText}>@{vibe.user?.username || 'user'}</Text>
+                            </TouchableOpacity>
+
+                            <View style={styles.cardContent}>
+                                <View style={styles.cardHeader}>
+                                    <Text style={styles.cardTitle}>{vibe.name}</Text>
+                                    <View style={styles.dateBadge}>
+                                        <Text style={styles.dateText}>{new Date(vibe.createdAt).toLocaleDateString()}</Text>
+                                    </View>
+                                </View>
+
+                                <Text style={styles.description} numberOfLines={2}>{vibe.description}</Text>
+
+                                <View style={styles.cardFooter}>
+                                    <View style={styles.tag}>
+                                        <Text style={styles.tagText}>{vibe.mood || 'Mix'}</Text>
+                                    </View>
+                                    <View style={{ flexDirection: 'row', gap: 15, marginLeft: 'auto' }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                            <FontAwesome name="heart" size={12} color="#666" />
+                                            <Text style={styles.dateText}>{vibe.likeCount || 0}</Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                            <FontAwesome name="bookmark" size={12} color="#666" />
+                                            <Text style={styles.dateText}>{vibe.saveCount || 0}</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            </View>
+                        </TouchableOpacity>
+                    ))
+                )}
 
             </ScrollView>
         </View>

@@ -48,7 +48,7 @@ const initYoutubeClient = async (req, res, next) => {
 
 // Create Playlist and Add Tracks
 router.post('/playlist', initYoutubeClient, async (req, res) => {
-    const { name, description, tracks } = req.body;
+    const { name, description, tracks, coverImage } = req.body;
 
     if (!tracks || !Array.isArray(tracks)) {
         return res.status(400).json({ error: 'Tracks are required' });
@@ -73,7 +73,38 @@ router.post('/playlist', initYoutubeClient, async (req, res) => {
         const playlistId = playlistRes.data.id;
         console.log(`Playlist created: ${playlistId}`);
 
-        // 2. Search and Add Videos
+        // 2. Set Playlist Thumbnail (if provided)
+        if (coverImage && coverImage.startsWith('data:image')) {
+            try {
+                console.log('Uploading custom thumbnail...');
+                // Extract base64 and type
+                const matches = coverImage.match(/^data:(.+);base64,(.+)$/);
+                if (matches) {
+                    const mimeType = matches[1];
+                    const buffer = Buffer.from(matches[2], 'base64');
+
+                    // Convert Buffer to Readable Stream specifically for googleapis
+                    const { Readable } = await import('stream');
+                    const stream = new Readable();
+                    stream.push(buffer);
+                    stream.push(null);
+
+                    await req.youtube.thumbnails.set({
+                        playlistId: playlistId,
+                        media: {
+                            mimeType: mimeType,
+                            body: stream
+                        }
+                    });
+                    console.log('Thumbnail uploaded successfully.');
+                }
+            } catch (thumbError) {
+                console.error('Failed to upload thumbnail:', thumbError.message);
+                // Non-critical error, proceed with tracks
+            }
+        }
+
+        // 3. Search and Add Videos
         const videoIds = [];
         for (const track of tracks) {
             try {
@@ -101,7 +132,7 @@ router.post('/playlist', initYoutubeClient, async (req, res) => {
             }
         }
 
-        // 3. Add videos to playlist (YouTube API requires adding one by one)
+        // 4. Add videos to playlist (YouTube API requires adding one by one)
         // We'll do it sequentially to avoid rate limits
         for (const videoId of videoIds) {
             try {

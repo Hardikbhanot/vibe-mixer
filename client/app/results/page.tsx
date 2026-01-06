@@ -246,7 +246,8 @@ function ResultsContent() {
                 body: JSON.stringify({
                     name: data.playlist_name,
                     description: data.playlist_description,
-                    tracks: data.tracks
+                    tracks: data.tracks,
+                    coverImage: coverImage // Send the generated custom image
                 }),
                 credentials: 'include'
             });
