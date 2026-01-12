@@ -1,72 +1,177 @@
-# VibeMixer 🎧
+# 🎧 VibeMixer
 
 **Your Mood. Your Mix. Instantly.**
 
-VibeMixer is a full-stack AI-powered application that orchestrates music discovery. It solves "playlist paralysis" by transforming natural language prompts into curated playlists, automatically syncing them to **Spotify** and **YouTube** in seconds.
+[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-vibemixer.hbhanot.tech-blue?style=for-the-badge)](https://vibemixer.hbhanot.tech/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-## 🚀 Live Demo
-https://vibemixer.hbhanot.tech/
+---
 
-## 💡 About The Project
+## 💡 What is VibeMixer?
 
-Finding the right music for a specific niche scenario—like *"Late night coding session with lo-fi beats"* or *"High energy 90s gym workout"*—usually requires manual curation. 
+**VibeMixer** is a next-generation AI-powered music discovery platform that solves "playlist paralysis." Instead of manually curating songs, simply describe your vibe—or upload an image—and let our AI orchestrate the perfect mix.
 
-VibeMixer automates this by:
-1.  **Interpreting Intent:** Using **Google Gemini AI** to analyze the user's prompt for mood, genre, tempo, and specific artists.
-2.  **Structured Data Extraction:** Converting abstract vibes into a strict JSON dataset of songs.
-3.  **Parallel API Orchestration:** Searching **Spotify** and **YouTube** simultaneously to find valid track URIs.
-4.  **Auto-Provisioning:** Creating the playlist directly in the user's library with custom AI-generated cover art.
+Whether it's *"Cyberpunk coding at 2 AM"* or *"Sunset drive through Miami 1984"*, VibeMixer understands the nuance and instantly syncs your custom playlist to **Spotify** and **YouTube**.
 
-## 🛠 Tech Stack
+Now available as a **Responsive Web App** and a **Native Mobile App** (iOS/Android).
 
-**Frontend:**
-* **Next.js (App Router):** For server-side rendering and optimized routing.
-* **React:** Component-based UI architecture.
-* **Tailwind CSS:** Responsive, modern styling with dark mode support.
-
-**Backend:**
-* **Node.js & Express:** RESTful API handling auth flows and third-party integrations.
-* **Prisma (PostgreSQL):** Robust ORM for managing user data, swipe history, and auth sessions.
-* **Google Gemini 1.5 Flash:** Large Language Model (LLM) for high-speed, structured JSON generation.
-* **Pollinations AI:** Real-time generation of playlist cover art.
-
-**Integrations:**
-* **Spotify Web API:** OAuth 2.0 authentication, track search, and playlist management.
-* **YouTube Data API v3:** Video search and playlist creation.
-* **OAuth 2.0:** Secure user authentication for both platforms.
+---
 
 ## ✨ Key Features
 
-* **🤖 AI-Driven Curation:** Understands complex, natural language prompts (e.g., "Songs for driving through Tokyo at night").
-* **🌍 Discover Feed:** Browse a community feed of public mixes curated by other users, tailored with custom AI cover art.
-* **📍 Indian Vibe Map:** Interactive map to discover trending music across different Indian states instantly.
-* **🔥 Swipe Mode:** Tinder-style "Like or Nope" interface to refine your music taste and train the recommendation engine.
-* **🎵 Dual-Platform Sync:** Generates playlists on **Spotify** and **YouTube** from a single prompt.
-* **💾 Community Save:** Save any public mix directly to ... your Spotify library with one click.
-* **👤 Creator Profiles:** Visit user profiles to see their public mix history and AI-generated bios.
-* **💬 Messaging System:** Real-time chat with other users directly from their profiles.
-* **📱 Mobile Optimized:** Fully responsive design with a mobile-first hamburger menu for easy navigation.
-* **⚡ Optimized Performance:** Uses parallel `Promise.all` execution for API searches, reducing generation time to <5 seconds.
-* **🖼️ Dynamic Cover Art:** Automatically generates visual cover art that matches the acoustic "vibe" of the playlist.
-* **🔐 Secure Authentication:** Implements Authorization Code Flow and Guest Mode for flexible access.
+### 🤖 AI-Powered Curation
+*   **Text-to-Mix**: Uses **Google Gemini 1.5 Flash** to translate complex prompts into structured musical attributes (tempo, genre, key).
+*   **Image-to-Vibe**: Upload a photo, and our vision models (**Groq / Llama 3.2 Vision**) analyze the scene to generate a matching soundtrack.
+*   **Dynamic Cover Art**: Automatically generates aesthetic cover art for every playlist using **Pollinations AI**.
 
-## ⚙️ Environment Variables
+### 🌍 Immersive Discovery
+*   **Indian Vibe Map**: An interactive D3.js map to explore trending music across different states of India.
+*   **Community Feed**: Browse, like, and save mixes created by other users in the verified community.
+*   **Swipe Mode**: A Tinder-style "Like or Pass" interface to refine your recommendations.
 
-To run this project locally, you will need to add the following variables to your `.env` file in the `server` directory:
+### 🎧 Seamless Playback
+*   **Cross-Platform Sync**: One-click save to **Spotify** and **YouTube**.
+*   **Deep Linking**: Open tracks directly in your favorite native apps from mobile.
+*   **Smart Fallbacks**: If a song isn't on Spotify, we find the best match on YouTube automatically.
+
+---
+
+## 🛠️ Tech Stack
+
+### ⚡ Client (Web)
+*   **Framework**: [Next.js 16](https://nextjs.org/) (App Router)
+*   **UI Library**: [React 19](https://react.dev/)
+*   **Styling**: [Tailwind CSS 4](https://tailwindcss.com/)
+*   **Animation**: Framer Motion
+*   **Visualization**: D3.js, React Simple Maps
+
+### 📱 Mobile (iOS & Android)
+*   **Framework**: [Expo 54](https://expo.dev/) (React Native 0.81)
+*   **Routing**: Expo Router
+*   **Auth**: Expo Secure Store
+*   **Design**: Native styling with linear gradients and blur effects
+
+### 🔙 Server (Backend)
+*   **Runtime**: Node.js 20 & Express 5
+*   **Database**: PostgreSQL (via [Prisma ORM](https://www.prisma.io/))
+*   **AI Services**: 
+    *   Google Gemini SDK (Text analysis)
+    *   Groq SDK (Vision analysis)
+*   **Integrations**: Spotify Web API, YouTube Data API v3
+
+---
+
+## 🚀 Getting Started
+
+VibeMixer is a monorepo. Follow these steps to set it up locally.
+
+### Prerequisites
+*   Node.js v20+
+*   npm or yarn
+*   PostgreSQL Database
+*   Expo Go app (for mobile testing)
+
+### 1. Installation
+
+Clone the repository and install dependencies for all workspaces:
+
+```bash
+git clone https://github.com/Hardikbhanot/vibe-mixer.git
+cd vibe-mixer
+
+# Install dependencies for each part
+cd server && npm install
+cd ../client && npm install
+cd ../mobile && npm install
+```
+
+### 2. Environment Setup
+
+Create a `.env` file in the `server` directory:
 
 ```env
 PORT=4000
-FRONTEND_URI=http://localhost:3000
+DATABASE_URL="postgresql://user:password@localhost:5432/vibemixer?schema=public"
+JWT_SECRET="your_jwt_secret"
 
-# Google Gemini AI
-GEMINI_API_KEY=your_gemini_key
+# AI Services
+GEMINI_API_KEY="your_google_ai_key"
+GROQ_API_KEY="your_groq_key"
 
 # Spotify API
-SPOTIFY_CLIENT_ID=your_spotify_client_id
-SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
-SPOTIFY_REDIRECT_URI=http://localhost:4000/auth/callback
+SPOTIFY_CLIENT_ID="your_spotify_id"
+SPOTIFY_CLIENT_SECRET="your_spotify_secret"
+SPOTIFY_REDIRECT_URI="http://localhost:4000/auth/callback"
 
 # Google/YouTube API
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-GOOGLE_REDIRECT_URI=http://localhost:4000/auth/google/callback
+GOOGLE_CLIENT_ID="your_google_client_id"
+GOOGLE_CLIENT_SECRET="your_google_client_secret"
+GOOGLE_REDIRECT_URI="http://localhost:4000/auth/google/callback"
+```
+
+Create a `.env.local` file in the `client` directory:
+
+```env
+NEXT_PUBLIC_API_URL="http://localhost:4000"
+```
+
+Create a `.env` file in the `mobile` directory (or use Expo secrets):
+
+```env
+EXPO_PUBLIC_API_URL="http://YOUR_LOCAL_IP_ADDRESS:4000"
+# Note: For mobile, use your machine's LAN IP (e.g., 192.168.1.5), not localhost.
+```
+
+### 3. Running the Project
+
+**Start the Backend:**
+```bash
+cd server
+npx prisma generate
+npx prisma db push
+npm run dev
+# Server runs on http://localhost:4000
+```
+
+**Start the Web Client:**
+```bash
+cd client
+npm run dev
+# Client runs on http://localhost:3000
+```
+
+**Start the Mobile App:**
+```bash
+cd mobile
+npm run ios  # or npm run android
+# Scan the QR code with Expo Go
+```
+
+---
+
+## 📱 Mobile Preview
+
+| Discover Feed | Playlist Details |
+|:---:|:---:|
+| <img src="https://via.placeholder.com/300x600?text=Discover+Screen" width="200" /> | <img src="https://via.placeholder.com/300x600?text=Playlist+Screen" width="200" /> |
+
+---
+
+## 🤝 Contributing
+
+Capabilities are limitless! If you have ideas for new vibes or features:
+1.  Fork the Project
+2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4.  Push to the Branch (`git push origin feature/AmazingFeature`)
+5.  Open a Pull Request
+
+---
+
+## 📄 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+
+**Crafted with ❤️ by Hardik Bhanot**
