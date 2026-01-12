@@ -147,13 +147,6 @@ npm run ios  # or npm run android
 # Scan the QR code with Expo Go
 ```
 
----
-
-## 📱 Mobile Preview
-
-| Discover Feed | Playlist Details |
-|:---:|:---:|
-| <img src="https://via.placeholder.com/300x600?text=Discover+Screen" width="200" /> | <img src="https://via.placeholder.com/300x600?text=Playlist+Screen" width="200" /> |
 
 ---
 
