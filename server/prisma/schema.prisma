@@ -1,10 +1,12 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  extensions = [vector]
 }
 
 model User {
@@ -99,6 +101,12 @@ model Playlist {
   
   tracks      Json     
   
+  // RAG / Vector Search Fields
+  embedding     Unsupported("vector(768)")?
+  avgTempo      Float?
+  avgEnergy     Float?
+  avgValence    Float?
+
   userId      String
   user        User     @relation(fields: [userId], references: [id])
   
@@ -139,3 +147,19 @@ enum Action {
   DISLIKE
   SUPERLIKE
 }
+
+model TrackKnowledge {
+  id              String   @id @default(uuid())
+  title           String
+  artist          String
+  lyrics          String   @db.Text
+  
+  // Semantic Vector of the lyrics
+  lyricsEmbedding Unsupported("vector(768)")?
+  
+  updatedAt       DateTime @updatedAt
+
+  @@unique([title, artist])
+}
+
+

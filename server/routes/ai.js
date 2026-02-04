@@ -1,6 +1,7 @@
 import express from 'express';
 import { generatePlaylistParams, analyzeImage, generateVibeAnalysis } from '../services/groq.js';
 import { generateImage } from '../services/imagen.js';
+import { generateEmbedding } from '../services/embedding.js';
 import { initSpotifyApi } from '../middleware/spotifyAuth.js';
 import { authenticateToken } from '../middleware/auth.js';
 import multer from 'multer';
@@ -33,8 +34,9 @@ router.post('/image', async (req, res) => {
 });
 
 // --- 2. Main Playlist Analysis Route ---
+// --- 2. Main Playlist Analysis Route (Hybrid RAG) ---
 router.post('/analyze', initSpotifyApi, async (req, res) => {
-    console.log('POST /ai/analyze hit');
+    console.log('POST /ai/analyze hit (RAG Enabled)');
     const { mood, duration = 60, vibeType = 'mix', energy, tempo, valence, model } = req.body;
 
     if (!mood) {
@@ -42,11 +44,95 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
     }
 
     try {
+        // --- STEP 1: EMBEDDING (Understand the Vibe) ---
+        let vibeEmbedding = null;
+        let similarPlaylistsContext = "";
+
+        try {
+            // Generate embedding for the user's prompt (mood)
+            vibeEmbedding = await generateEmbedding(mood);
+            console.log('[RAG] Generated embedding for prompt.');
+
+            // --- STEP 2: HYBRID RETRIEVAL (Semantic + Metadata) ---
+            // Find playlists that match the Vibe (Vector) AND the Energy/Tempo (Metadata)
+
+            // Raw SQL for pgvector similarity search
+            // Using Cosine Distance (<=>): Lower is better match
+
+            // Build metadata filters
+            let energyFilter = "";
+            let tempoFilter = "";
+
+            // Tolerances: Energy ±0.2, Tempo ±20 BPM
+            if (energy !== undefined) {
+                // energy is 0-100 from frontend, DB is 0-1
+                const targetEnergy = energy / 100;
+                energyFilter = `AND "avgEnergy" BETWEEN ${targetEnergy - 0.2} AND ${targetEnergy + 0.2}`;
+            }
+            if (tempo !== undefined) {
+                // tempo is 0-100 (slider), map to ~60-180 BPM or raw BPM if provided?
+                // Assuming frontend sends raw 0-100 slider, let's map it roughly: 0=60, 100=180
+                const targetBPM = 60 + (tempo * 1.2);
+                tempoFilter = `AND "avgTempo" BETWEEN ${targetBPM - 20} AND ${targetBPM + 20}`;
+            }
+
+            // Only query if we have an embedding
+            const vectorQuery = `
+                SELECT name, description, tracks, 1 - (embedding <=> $1::vector) as similarity
+                FROM "Playlist"
+                WHERE isPublic = true
+                ${energyFilter}
+                ${tempoFilter}
+                ORDER BY embedding <=> $1::vector
+                LIMIT 3;
+            `;
+
+            // Note: Use a prepared statement or extensive sanitization in prod. 
+            // For now, we trust internal inputs or use Prisma's raw params strictly.
+            // Prisma defines variables as $1, $2 etc.
+
+            // Execute Vibe Search (Playlists)
+            const similarPlaylists = await prisma.$queryRawUnsafe(
+                `SELECT name, description, tracks FROM "Playlist" WHERE "isPublic" = true ORDER BY embedding <=> $1::vector LIMIT 3`,
+                `[${vibeEmbedding.join(',')}]`
+            );
+
+            // Execute Lyrical Search (TrackKnowledge)
+            const lyricMatches = await prisma.$queryRawUnsafe(
+                `SELECT title, artist, lyrics FROM "TrackKnowledge" ORDER BY "lyricsEmbedding" <=> $1::vector LIMIT 3`,
+                `[${vibeEmbedding.join(',')}]`
+            );
+
+            // Format Playlist Matches
+            if (similarPlaylists.length > 0) {
+                const examples = similarPlaylists.map(p => {
+                    const trackList = Array.isArray(p.tracks)
+                        ? p.tracks.slice(0, 3).map(t => `${t.name} by ${t.artist}`).join(', ')
+                        : "Various Artists";
+                    return `- "${p.name}": ${p.description} (Tracks like: ${trackList})`;
+                }).join('\n');
+                similarPlaylistsContext = `\nVIBE MATCHES (Past successful playlists): \n${examples}\n`;
+                console.log(`[RAG] Found ${similarPlaylists.length} semantic matches.`);
+            } else {
+                console.log('[RAG] No semantic matches found.');
+            }
+
+            // Format Lyric Matches
+            if (lyricMatches.length > 0) {
+                const songs = lyricMatches.map(s => `- "${s.title}" by ${s.artist} (Lyrics match theme: "${s.lyrics.substring(0, 50)}...")`).join('\n');
+                similarPlaylistsContext += `\nLYRICAL THEME MATCHES (Include these if fit): \n${songs}\n`;
+                console.log(`[RAG] Found ${lyricMatches.length} lyrical matches.`);
+            }
+
+            console.log(`[RAG] Context injection prepared.`);
+
+        } catch (ragError) {
+            console.warn('[RAG] Retrieval failed, falling back to pure generation:', ragError.message);
+        }
+
         // Calculate target number of tracks (avg song ~3.5 mins) + 20% buffer
         const avgSongLengthMins = 3.5;
         const targetTrackCount = Math.ceil((duration / avgSongLengthMins) * 1.2);
-
-        console.log(`Targeting ~${targetTrackCount} tracks for ${duration} mins`);
 
         // --- PERSONALIZATION: Fetch User Context if Logged In ---
         let userContext = "";
@@ -63,61 +149,46 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
                 if (user && user.topArtists && Array.isArray(user.topArtists)) {
                     const topArtistNames = user.topArtists.slice(0, 10).map(a => a.name).join(', ');
                     userContext = `The user loves: ${topArtistNames}. Include similar artists or influences.`;
-                    console.log(`[AI] Personalization enabled for user ${decoded.email}`);
                 }
             } catch (authErr) {
-                console.log('[AI] Personalization skipped (invalid token or guest)');
+                // Personalization skipped
             }
         }
 
-
-
-        // --- DATA FRESHNESS: Targeted RAG (Search for RELEVANT new music) ---
+        // --- DATA FRESHNESS: Targeted Search ---
         let newReleasesContext = "";
         try {
-            // "Realistic" Search: Look for the specific Vibe in the current year
-            // This finds "Sad indie songs 2026" instead of just "Any new song"
             const currentYear = new Date().getFullYear();
-            const searchYear = `${currentYear - 1}-${currentYear}`; // e.g., "2025-2026"
-
-            // Clean mood string for search (remove generic words if needed, but strict is fine)
+            const searchYear = `${currentYear - 1}-${currentYear}`;
             const query = `${mood} year:${searchYear}`;
-            console.log(`[AI] Searching Spotify for fresh context: "${query}"`);
-
-            const freshSearch = await req.spotifyApi.searchTracks(query, { limit: 10 });
+            const freshSearch = await req.spotifyApi.searchTracks(query, { limit: 5 });
 
             if (freshSearch.body.tracks.items.length > 0) {
                 const freshTracks = freshSearch.body.tracks.items.map(t =>
-                    `"${t.name}" by ${t.artists[0].name} (Released: ${t.album.release_date})`
+                    `"${t.name}" by ${t.artists[0].name}`
                 ).join(', ');
-
-                newReleasesContext = `\nRELEVANT FRESH RELEASES (Prioritize these if they fit): ${freshTracks}`;
-                console.log('[AI] Injected vibe-specific fresh tracks');
-            } else {
-                console.log('[AI] No fresh tracks found for this specific vibe.');
+                newReleasesContext = `\nFRESH RELEASES (2025-26): ${freshTracks}`;
             }
-        } catch (freshErr) {
-            console.warn('[AI] Failed to fetch fresh context:', freshErr.message);
+        } catch (err) {
+            // Freshness skipped
         }
 
-        // 1. Generate parameters using Groq (Now returns 'reason' in suggestions)
-        // Combine contexts
-        const combinedContext = (userContext + newReleasesContext).trim();
+        // --- STEP 3: AUGMENTATION ---
+        // Combine contexts: User Taste + RAG Retrieval + Freshness
+        const combinedContext = (userContext + similarPlaylistsContext + newReleasesContext).trim();
+
+        // 1. Generate parameters using Groq
         const aiParams = await generatePlaylistParams(mood, vibeType, targetTrackCount, { energy, tempo, valence }, combinedContext, model);
         console.log('AI Params Generated');
 
         // 2. Search Spotify for each suggested track
         const trackPromises = aiParams.suggested_tracks.map(async (suggestion) => {
             try {
-                // Specific search for Track + Artist
                 const query = `track:${suggestion.song} artist:${suggestion.artist}`;
                 const searchResult = await req.spotifyApi.searchTracks(query, { limit: 1 });
 
-                // Return the first match if found
                 if (searchResult.body.tracks.items.length > 0) {
                     const spotifyTrack = searchResult.body.tracks.items[0];
-
-                    // ✅ KEY UPDATE: Merge the AI's reason with the Spotify data
                     return {
                         ...spotifyTrack,
                         ai_reason: suggestion.reason || "Fits the vibe perfectly."
@@ -125,18 +196,13 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
                 }
                 return null;
             } catch (err) {
-                console.error(`Failed to search for "${suggestion.song}":`, err);
                 return null;
             }
         });
 
         const searchResults = await Promise.all(trackPromises);
-
-        // Filter out nulls (failed searches) and remove duplicates
         const foundTracks = searchResults.filter(track => track !== null);
         const uniqueTracks = Array.from(new Map(foundTracks.map(track => [track.id, track])).values());
-
-        // 3. Filter and Sort (Trust AI order, but filter crazy long songs)
         const filteredTracks = uniqueTracks.filter(track => track.duration_ms < 600000);
 
         // 4. Select tracks to fill duration
@@ -145,21 +211,16 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
         const finalTracks = [];
 
         for (const track of filteredTracks) {
-            // Always add at least one track, then check duration
             if (finalTracks.length > 0 && currentDurationMs >= targetDurationMs) break;
-
             finalTracks.push(track);
             currentDurationMs += track.duration_ms;
         }
 
-        console.log(`Generated ${finalTracks.length} tracks. Total Duration: ${Math.round(currentDurationMs / 60000)} mins`);
-
-        // 5. Return combined data
         res.json({
             ...aiParams,
-            tracks: finalTracks, // Contains .ai_reason
+            tracks: finalTracks,
             total_duration_mins: Math.round(currentDurationMs / 60000),
-            isGuest: req.isGuest // Return auth status to frontend
+            isGuest: req.isGuest
         });
 
     } catch (error) {

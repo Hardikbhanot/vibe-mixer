@@ -59,6 +59,18 @@ Now available as a **Responsive Web App** and a **Native Mobile App** (iOS/Andro
     *   Groq SDK (Vision analysis)
 *   **Integrations**: Spotify Web API, YouTube Data API v3
 
+### 🏗️ Architecture: Real-Time RAG
+
+VibeMixer implements a **Real-Time Retrieval-Augmented Generation (RAG)** engine to ensure recommendations are not just creative, but grounded and current.
+
+1.  **Retrieval**:
+    *   **User Context**: Fetches your top artists and listening history from the database to personalize the seed.
+    *   **Market Freshness**: Queries the Spotify Search API for new releases (e.g., "Songs released in 2024-2025") matching the requested vibe.
+2.  **Augmentation**:
+    *   Injects this live context into the **Gemini 1.5 Flash / Groq** system prompt.
+3.  **Generation**:
+    *   The LLM generates a structured JSON playlist that blends your personal taste with the latest trending tracks, avoiding the "knowledge cutoff" limitation of standard models.
+
 ---
 
 ## 🚀 Getting Started
