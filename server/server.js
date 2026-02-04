@@ -61,4 +61,11 @@ app.get("/", (req, res) => {
   res.send("Backend is running!");
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+
+  // Start Background Seeder (Auto-runs on deploy)
+  import('./services/backgroundSeeder.js').then(({ startBackgroundSeeding }) => {
+    startBackgroundSeeding();
+  }).catch(err => console.error('Failed to start seeder:', err));
+});
