@@ -65,13 +65,9 @@ app.get("/", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 
-  // Start Background Seeder (Only if enabled)
-  if (process.env.ENABLE_SEEDER === 'true') {
-    console.log('[Seeder] ENABLE_SEEDER=true. Starting background worker...');
-    import('./services/backgroundSeeder.js').then(({ startBackgroundSeeding }) => {
-      startBackgroundSeeding();
-    }).catch(err => console.error('Failed to start seeder:', err));
-  } else {
-    console.log('[Seeder] Background worker disabled (ENABLE_SEEDER != true).');
-  }
+  // Start Background Seeder (Auto-runs on deploy)
+  // Now uses Gemini (AI) so it's safe for Cloud IPs
+  import('./services/backgroundSeeder.js').then(({ startBackgroundSeeding }) => {
+    startBackgroundSeeding();
+  }).catch(err => console.error('Failed to start seeder:', err));
 });
