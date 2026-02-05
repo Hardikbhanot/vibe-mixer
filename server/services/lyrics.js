@@ -1,46 +1,76 @@
+import Groq from 'groq-sdk';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from 'dotenv';
 
 dotenv.config();
 
+// 1. Primary: Groq (Llama 3)
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+// 2. Secondary: Google Gemini (Flash)
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 export const fetchLyrics = async (title, artist) => {
-    if (!process.env.GOOGLE_API_KEY) {
-        console.warn('[Lyrics] GOOGLE_API_KEY is missing. Lyrics fetch skipped.');
-        return null;
+    // Strategy: Try Groq -> Fallback to Gemini -> Give Up
+
+    let lyrics = await fetchWithGroq(title, artist);
+
+    if (!lyrics) {
+        console.log(`[Lyrics] Groq missed it. Trying Gemini fallback...`);
+        lyrics = await fetchWithGemini(title, artist);
     }
 
-    try {
-        console.log(`[Lyrics] 🧠 Asking Gemini for lyrics: "${title}" by ${artist}...`);
-
-        const prompt = `
-            You are a music expert database.
-            Please provide the full lyrics for the song "${title}" by "${artist}".
-            
-            Rules:
-            1. Return ONLY the lyrics.
-            2. Do not include introductory text like "Here are the lyrics" or "Sure".
-            3. Do not include [Chorus], [Verse] tags if possible, just the lines.
-            4. If the song is instrumental or you are 100% unsure, return "Not Found".
-            5. If there are multiple versions, prefer the original/most popular one.
-        `;
-
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text().trim();
-
-        if (text === "Not Found" || text.length < 20 || text.includes("I cannot provide the lyrics")) {
-            console.log('[Lyrics] Gemini could not provide lyrics (Instrumental or Copyright blocked).');
-            return null;
-        }
-
-        console.log(`[Lyrics] Success! Generated/Recalled ${text.length} chars.`);
-        return text;
-
-    } catch (error) {
-        console.error('[Lyrics] Gemini Error:', error.message);
+    if (lyrics) {
+        console.log(`[Lyrics] ✅ Success! Saved ${lyrics.length} chars.`);
+        return lyrics;
+    } else {
+        console.log(`[Lyrics] ❌ Both AIs failed for "${title}". Skipping.`);
         return null;
     }
 };
+
+async function fetchWithGroq(title, artist) {
+    if (!process.env.GROQ_API_KEY) return null;
+    try {
+        console.log(`[Lyrics] ⚡ Asking Groq (Llama 3)... "${title}"`);
+        const completion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: "system",
+                    content: "You are a music database interaction layer. Return ONLY the song lyrics directly. No markdown code blocks, no intro, no outro. If it is an instrumental or you do not know the lyrics with high confidence, return 'NOT_FOUND'."
+                },
+                {
+                    role: "user",
+                    content: `Lyrics for "${title}" by "${artist}"`
+                }
+            ],
+            model: "llama-3.3-70b-versatile",
+            temperature: 0.3, // Slightly higher for better recall
+            max_tokens: 3000
+        });
+
+        const text = completion.choices[0]?.message?.content?.trim();
+        if (!text || text === "NOT_FOUND" || text.includes("I cannot provide") || text.length < 50) return null;
+        return text;
+    } catch (e) {
+        console.error('[Lyrics] Groq Error:', e.message);
+        return null;
+    }
+}
+
+async function fetchWithGemini(title, artist) {
+    if (!process.env.GOOGLE_API_KEY) return null;
+    try {
+        console.log(`[Lyrics] 🧠 Asking Gemini (Flash)... "${title}"`);
+        const prompt = `Return the lyrics for "${title}" by "${artist}". Return ONLY text. If unknown or instrumental, return "NOT_FOUND".`;
+        const result = await geminiModel.generateContent(prompt);
+        const text = result.response.text().trim();
+
+        if (text === "NOT_FOUND" || text.includes("I cannot provide") || text.length < 50) return null;
+        return text;
+    } catch (e) {
+        console.error('[Lyrics] Gemini Error:', e.message);
+        return null;
+    }
+}
