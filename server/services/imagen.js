@@ -1,53 +1,38 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 export const generateImage = async (prompt) => {
     try {
         console.log('[Imagen] Generating cover art for:', prompt);
 
-        const apiKey = process.env.GOOGLE_API_KEY;
-        if (!apiKey) {
-            throw new Error("Missing GOOGLE_API_KEY");
-        }
+        const cleanPrompt = encodeURIComponent(prompt.trim().slice(0, 500));
+        // Use Flux model for better quality, ensure nologo
+        const url = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1024&height=1024&nologo=true&model=flux`;
 
-        // Google Imagen 3 API (via AI Studio / Generative Language API)
-        // Note: This endpoint is for the specialized image generation model
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${apiKey}`;
+        console.log('[Imagen] Fetching from Pollinations (Flux)...');
 
-        const payload = {
-            instances: [
-                {
-                    prompt: `${prompt}, high quality, 4k, album cover art, aesthetic, vibrant`,
-                }
-            ],
-            parameters: {
-                sampleCount: 1,
-                aspectRatio: "1:1",
-                personGeneration: "allow_adult", // Required setting for some prompts
-            }
-        };
+        const response = await axios.get(url, {
+            responseType: 'arraybuffer',
+            headers: {
+                // Mimic browser to avoid bot blocks
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            timeout: 15000 // 15s timeout
+        });
 
-        console.log('[Imagen] Calling Google API...');
-        const response = await axios.post(url, payload);
+        // Convert binary data to Base64
+        const contentType = response.headers['content-type'] || 'image/jpeg';
+        const base64Image = Buffer.from(response.data, 'binary').toString('base64');
+        const dataUri = `data:${contentType};base64,${base64Image}`;
 
-        if (response.data && response.data.predictions && response.data.predictions.length > 0) {
-            const base64Image = response.data.predictions[0].bytesBase64Encoded;
-            const mimeType = response.data.predictions[0].mimeType || 'image/png';
-
-            console.log('[Imagen] Success! Google generated an image.');
-            return `data:${mimeType};base64,${base64Image}`;
-        } else {
-            throw new Error('No predictions in Google API response');
-        }
+        console.log('[Imagen] Success! Generated image.');
+        return dataUri;
 
     } catch (error) {
-        console.error("[Imagen] Google Generation Failed:", error.response?.data || error.message);
+        console.error("[Imagen] Generation Failed:", error.message);
         console.log("[Imagen] Falling back to Unsplash...");
 
-        // Robust Fallback: Unsplash Source with keywords
-        const keywords = encodeURIComponent(prompt.split(' ').slice(0, 3).join(','));
-        return `https://source.unsplash.com/1600x1600/?${keywords},abstract`;
+        // Fallback: Unsplash
+        const keywords = encodeURIComponent(prompt.split(' ').slice(0, 2).join(','));
+        return `https://source.unsplash.com/1600x1600/?${keywords},art`;
     }
 };
