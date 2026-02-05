@@ -32,6 +32,7 @@
     "groq-sdk": "^0.37.0",
     "jimp": "^1.6.0",
     "jsonwebtoken": "^9.0.3",
+    "lyrics-finder": "^21.7.0",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.12",
     "openai": "^6.9.1",
