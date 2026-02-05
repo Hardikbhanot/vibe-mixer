@@ -1,76 +1,48 @@
-import Groq from 'groq-sdk';
+import axios from 'axios';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// 1. Primary: Groq (Llama 3)
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
-// 2. Secondary: Google Gemini (Flash)
+// Initialize Gemini 2.5 Flash (Confirmed Available)
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 export const fetchLyrics = async (title, artist) => {
-    // Strategy: Try Groq -> Fallback to Gemini -> Give Up
-
-    let lyrics = await fetchWithGroq(title, artist);
-
-    if (!lyrics) {
-        console.log(`[Lyrics] Groq missed it. Trying Gemini fallback...`);
-        lyrics = await fetchWithGemini(title, artist);
-    }
-
-    if (lyrics) {
-        console.log(`[Lyrics] ✅ Success! Saved ${lyrics.length} chars.`);
-        return lyrics;
-    } else {
-        console.log(`[Lyrics] ❌ Both AIs failed for "${title}". Skipping.`);
-        return null;
-    }
-};
-
-async function fetchWithGroq(title, artist) {
-    if (!process.env.GROQ_API_KEY) return null;
+    // 1. Try Public Lyrics API (Real Data)
     try {
-        console.log(`[Lyrics] ⚡ Asking Groq (Llama 3)... "${title}"`);
-        const completion = await groq.chat.completions.create({
-            messages: [
-                {
-                    role: "system",
-                    content: "You are a music database interaction layer. Return ONLY the song lyrics directly. No markdown code blocks, no intro, no outro. If it is an instrumental or you do not know the lyrics with high confidence, return 'NOT_FOUND'."
-                },
-                {
-                    role: "user",
-                    content: `Lyrics for "${title}" by "${artist}"`
-                }
-            ],
-            model: "llama-3.3-70b-versatile",
-            temperature: 0.3, // Slightly higher for better recall
-            max_tokens: 3000
-        });
+        console.log(`[Lyrics] 🌐 Checking public API for: "${title}"...`);
+        // Lyrist is a clean wrapper around various lyric sources
+        const { data } = await axios.get(`https://lyrist.vercel.app/api/${encodeURIComponent(title)}/${encodeURIComponent(artist)}`);
 
-        const text = completion.choices[0]?.message?.content?.trim();
-        if (!text || text === "NOT_FOUND" || text.includes("I cannot provide") || text.length < 50) return null;
-        return text;
-    } catch (e) {
-        console.error('[Lyrics] Groq Error:', e.message);
-        return null;
+        if (data && data.lyrics && data.lyrics.length > 50) {
+            console.log(`[Lyrics] ✅ Found via Public API! (${data.lyrics.length} chars)`);
+            return data.lyrics;
+        }
+    } catch (apiError) {
+        console.warn(`[Lyrics] Public API failed (${apiError.message}). Switch to AI Fallback.`);
     }
-}
 
-async function fetchWithGemini(title, artist) {
+    // 2. Fallback: Ask Gemini 2.5 (AI Memory)
     if (!process.env.GOOGLE_API_KEY) return null;
+
     try {
-        console.log(`[Lyrics] 🧠 Asking Gemini (Flash)... "${title}"`);
-        const prompt = `Return the lyrics for "${title}" by "${artist}". Return ONLY text. If unknown or instrumental, return "NOT_FOUND".`;
+        console.log(`[Lyrics] 🧠 Fallback to Gemini 2.5 Flash...`);
+        const prompt = `Return the lyrics for "${title}" by "${artist}". Return ONLY text, no markdown, no intro. If unrelated or instrumental, return "NOT_FOUND".`;
+
         const result = await geminiModel.generateContent(prompt);
         const text = result.response.text().trim();
 
-        if (text === "NOT_FOUND" || text.includes("I cannot provide") || text.length < 50) return null;
+        if (text === "NOT_FOUND" || text.includes("I cannot provide") || text.length < 50) {
+            console.log(`[Lyrics] Gemini returned: ${text.substring(0, 20)}...`);
+            return null;
+        }
+
+        console.log(`[Lyrics] ✅ Gemini Recalled! (${text.length} chars)`);
         return text;
-    } catch (e) {
-        console.error('[Lyrics] Gemini Error:', e.message);
+
+    } catch (aiError) {
+        console.error('[Lyrics] Gemini Error:', aiError.message);
         return null;
     }
-}
+};
