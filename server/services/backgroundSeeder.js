@@ -15,7 +15,7 @@ const spotifyApi = new SpotifyWebApi({
     clientSecret: process.env.SPOTIFY_CLIENT_SECRET
 });
 
-const SLEEP_MS = 5000; // 5 seconds between songs to avoid rate limits
+const SLEEP_MS = 15000; // 15s delay (Max 4 requests/min to respect Gemini Free Tier 5 RPM)
 const BATCH_SIZE = 50;
 
 // Search queries to find popular playlists dynamically
@@ -156,8 +156,13 @@ async function processPlaylistQueue() {
                                     console.log(`[Seeder] ❌ No lyrics found for "${title}"`);
                                 }
                             } catch (err) {
-                                console.error(`[Seeder] Error processing "${title}":`, err.message);
-                                await sleep(2000); // Wait bit longer on error
+                                if (err.message.includes('429') || err.message.includes('Quota')) {
+                                    console.warn(`[Seeder] ⚠️ Rate Limit Hit! Pausing for 60 seconds...`);
+                                    await sleep(60000); // Cool down for 1 minute
+                                } else {
+                                    console.error(`[Seeder] Error processing "${title}":`, err.message);
+                                    await sleep(2000);
+                                }
                             }
                         }
                     }
