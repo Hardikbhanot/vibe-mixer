@@ -14,7 +14,7 @@ import swipeRoutes from './routes/swipe.js';
 import userRoutes from './routes/user.js';
 import playlistRoutes from './routes/playlists.js';
 import matchRoutes from './routes/match.js';
-import adminRoutes from './routes/admin.js';
+// import adminRoutes from './routes/admin.js';
 import messageRoutes from './routes/messages.js';
 
 
@@ -54,7 +54,8 @@ app.use('/api/swipe', swipeRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/match', matchRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/match', matchRoutes);
+// app.use('/api/admin', adminRoutes); // Removed (Using Dev-Mode Seeder)
 app.use('/api/messages', messageRoutes);
 
 app.get("/", (req, res) => {
@@ -64,8 +65,13 @@ app.get("/", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 
-  // Start Background Seeder (Auto-runs on deploy)
-  import('./services/backgroundSeeder.js').then(({ startBackgroundSeeding }) => {
-    startBackgroundSeeding();
-  }).catch(err => console.error('Failed to start seeder:', err));
+  // Start Background Seeder (Only if enabled)
+  if (process.env.ENABLE_SEEDER === 'true') {
+    console.log('[Seeder] ENABLE_SEEDER=true. Starting background worker...');
+    import('./services/backgroundSeeder.js').then(({ startBackgroundSeeding }) => {
+      startBackgroundSeeding();
+    }).catch(err => console.error('Failed to start seeder:', err));
+  } else {
+    console.log('[Seeder] Background worker disabled (ENABLE_SEEDER != true).');
+  }
 });
