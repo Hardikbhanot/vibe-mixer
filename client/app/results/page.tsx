@@ -4,6 +4,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Header } from "@/components/Header";
 import { useEffect, useState, Suspense } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import html2canvas from "html2canvas";
 
@@ -22,6 +23,8 @@ interface Track {
     duration_ms: number;
     external_urls: { spotify: string };
     ai_reason?: string;
+    confidence_score?: number;
+    match_type?: string;
 }
 
 interface PlaylistData {
@@ -37,6 +40,7 @@ interface PlaylistData {
 function ResultsContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { user } = useAuth(); // <--- LIVE USER STATE
 
     const [data, setData] = useState<PlaylistData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -324,7 +328,7 @@ function ResultsContent() {
                 <div className="flex flex-col gap-4 mb-8">
                     <button
                         onClick={() => {
-                            if (data.isGuest) {
+                            if (!user) { // <--- Changed from data.isGuest
                                 router.push('/auth?next=/swipe');
                             } else {
                                 router.push('/swipe');
@@ -333,7 +337,7 @@ function ResultsContent() {
                         className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary to-secondary text-white font-bold text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
                     >
                         <span className="material-symbols-outlined text-2xl">graphic_eq</span>
-                        {data.isGuest ? 'Login to Refine' : 'Refine Your Vibe'}
+                        {!user ? 'Login to Refine' : 'Refine Your Vibe'}
                     </button>
                 </div>
 
@@ -362,7 +366,7 @@ function ResultsContent() {
                             <p className="text-muted-foreground text-sm mt-1">{data.tracks.length} Tracks • {data.total_duration_mins || Math.round(data.tracks.reduce((acc, t) => acc + t.duration_ms, 0) / 60000)} mins</p>
                         </div>
                         <div className="flex flex-wrap gap-3 justify-center md:justify-start">
-                            {!data.isGuest ? (
+                            {user ? ( // <--- Changed from !data.isGuest
                                 <button onClick={handleSaveToSpotify} disabled={isSaving} className="flex items-center justify-center gap-2 h-10 px-6 bg-[#1DB954] text-white text-sm font-bold rounded-full hover:scale-105 transition-transform disabled:opacity-50">
                                     <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_White.png" alt="Spotify" className="h-5 w-auto" />
                                     {isSaving ? 'Saving...' : 'Save to Spotify'}
@@ -404,6 +408,11 @@ function ResultsContent() {
                                 <span className="material-symbols-outlined text-xl">ios_share</span>
                                 {isSharing ? 'Generating...' : 'Share Story'}
                             </button>
+
+                            <Link href="/results/breakdown" className="flex items-center justify-center gap-2 h-10 px-6 bg-gray-800 text-white text-sm font-bold rounded-full hover:bg-gray-700 transition-colors">
+                                <span className="material-symbols-outlined text-xl">analytics</span>
+                                Why?
+                            </Link>
                         </div>
                     </div>
                 </div>
@@ -437,6 +446,26 @@ function ResultsContent() {
                                         <p className="text-xs text-primary/90 italic leading-relaxed whitespace-normal break-words">
                                             {track.ai_reason}
                                         </p>
+                                    </div>
+                                )}
+
+                                {track.confidence_score && (
+                                    <div className="mt-1 flex items-center gap-2">
+                                        <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${track.match_type?.includes('Vector')
+                                            ? 'bg-green-500/10 text-green-500 border-green-500/20'
+                                            : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                                            }`}>
+                                            {track.match_type || 'AI Match'}
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <div className="h-1.5 w-16 bg-gray-700 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full ${track.confidence_score > 90 ? 'bg-green-500' : 'bg-blue-500'}`}
+                                                    style={{ width: `${track.confidence_score}%` }}
+                                                />
+                                            </div>
+                                            <span className="text-[10px] text-muted-foreground">{track.confidence_score}%</span>
+                                        </div>
                                     </div>
                                 )}
                             </div>

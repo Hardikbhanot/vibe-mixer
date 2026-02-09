@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Header } from '@/components/Header';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface PublicPlaylist {
     id: string;
@@ -20,6 +21,7 @@ interface PublicPlaylist {
 }
 
 export default function DiscoverPage() {
+    const router = useRouter();
     const [playlists, setPlaylists] = useState<PublicPlaylist[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -78,8 +80,12 @@ export default function DiscoverPage() {
                 ) : (
                     <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
                         {playlists.map((playlist) => (
-                            // Link to the specific mix page
-                            <Link key={playlist.id} href={`/mix/${playlist.id}`} className="block break-inside-avoid">
+                            // Link to the specific mix page - REFACTORED to DIV to avoid nested Links (Hydration Error)
+                            <div
+                                key={playlist.id}
+                                onClick={() => router.push(`/mix/${playlist.id}`)}
+                                className="block break-inside-avoid cursor-pointer"
+                            >
                                 <div className="group relative bg-surface-light dark:bg-surface-dark rounded-3xl overflow-hidden hover:shadow-xl transition-all border border-foreground/5 hover:border-primary/20 flex flex-col h-full hover:-translate-y-1 transform-gpu">
 
                                     {/* Cover Image with Play Overlay */}
@@ -137,7 +143,7 @@ export default function DiscoverPage() {
                                         </div>
                                     </div>
                                 </div>
-                            </Link>
+                            </div>
                         ))}
                     </div>
                 )}

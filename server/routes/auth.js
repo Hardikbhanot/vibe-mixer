@@ -24,7 +24,6 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 
-// const prisma = new PrismaClient(); // REMOVED to prevent connection leak
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-change-in-prod';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
@@ -62,7 +61,7 @@ router.post('/forgot-password', async (req, res) => {
         });
 
         // Email Link
-        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
         const resetLink = `${clientUrl}/auth/reset-password?token=${resetToken}`;
 
         // Send Email (or Log)
@@ -268,7 +267,7 @@ router.get('/callback', async (req, res) => {
         const data = await spotifyApi.authorizationCodeGrant(code);
         const { access_token, refresh_token, expires_in } = data.body;
 
-        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
         console.log('[Spotify Callback] Success via Spotify API');
 
         // Fetch User Profile from Spotify to link/create account
@@ -439,7 +438,7 @@ router.get('/google/callback', async (req, res) => {
     const code = req.query.code || null;
 
     if (!code) {
-        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
         return res.redirect(`${clientUrl}/results?error=google_auth_failed`);
     }
 
@@ -462,7 +461,7 @@ router.get('/google/callback', async (req, res) => {
 
         if (data.error) {
             console.error('Google Token Error:', data);
-            const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+            const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
             return res.redirect(`${clientUrl}/results?error=google_token_error`);
         }
 
@@ -558,12 +557,12 @@ router.get('/google/callback', async (req, res) => {
 
         // Web Redirect
         console.log('[Google Auth] Fallback: Defaulting to Web Redirect.');
-        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
         res.redirect(`${clientUrl}/generate`);
 
     } catch (error) {
         console.error('Google Auth Error:', error);
-        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
         res.redirect(`${clientUrl}/results?error=server_error`);
     }
 });
