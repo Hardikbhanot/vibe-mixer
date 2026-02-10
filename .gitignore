@@ -39,3 +39,6 @@ pnpm-debug.log*
 # Secrets
 google-key.json
 *.jpg
+server/data/lyrics.csv
+*.csv
+./server/data/lyrics.csv

@@ -160,7 +160,24 @@ npm run ios  # or npm run android
 ```
 
 
+
 ---
+
+## 🎹 Bulk Lyrics Import (Dataset Seeding)
+
+To populate the database with thousands of songs efficiently:
+
+1.  **Download Dataset:** Get the [Genius Song Lyrics](https://www.kaggle.com/datasets/carlosgdcj/genius-song-lyrics-with-language-information) (or similar) from Kaggle.
+2.  **Place File:** Save it as `server/data/lyrics.csv`.
+3.  **Run Script:**
+    ```bash
+    node server/scripts/bulkImport.js
+    ```
+    *   *Note:* The script includes a rate limit (1 song/4s) to stay within Gemini Free Tier.
+    *   *Tip:* It filters for songs with >100k views by default.
+
+---
+
 
 ## 🤝 Contributing
 

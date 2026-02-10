@@ -9,7 +9,10 @@ const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
 export const generateEmbedding = async (text) => {
     try {
         console.log(`[Embedding] Generating embedding for: "${text.substring(0, 50)}..."`);
-        const result = await model.embedContent(text, { outputDimensionality: 768 });
+        const result = await model.embedContent({
+            content: { parts: [{ text: text }] },
+            outputDimensionality: 768
+        });
         const embedding = result.embedding;
         return embedding.values;
     } catch (error) {

@@ -222,14 +222,15 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
             const titles = finalTracks.map(t => t.name);
             // safe query using Prisma raw
             if (titles.length > 0) {
+                // Fix: Case-insensitive match for Vector Scores
                 const vectorScores = await prisma.$queryRawUnsafe(
                     `SELECT title, 1 - ("lyricsEmbedding" <=> $1::vector) as score 
                    FROM "TrackKnowledge" 
-                   WHERE title IN (${titles.map(t => `'${t.replace(/'/g, "''")}'`).join(',')})`,
+                   WHERE LOWER(title) IN (${titles.map(t => `'${t.toLowerCase().replace(/'/g, "''")}'`).join(',')})`,
                     `[${vibeEmbedding.join(',')}]`
                 );
 
-                // Map scores back to tracks
+                // Map scores back to tracks (using lower case keys)
                 const scoreMap = new Map();
                 vectorScores.forEach(s => scoreMap.set(s.title.toLowerCase(), s.score));
 
