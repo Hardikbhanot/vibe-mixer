@@ -48,34 +48,15 @@ router.post('/', authenticateToken, async (req, res) => {
 
         // --- BACKGROUND LEARNING: Lyrical RAG ---
         // Fire-and-forget: Learn the lyrics for these tracks to improve future matching
+        // --- BACKGROUND LEARNING: Knowledge Repository ---
         (async () => {
             console.log('[RAG] Starting background learning for new tracks...');
-            const { fetchLyrics } = await import('../services/lyrics.js');
-            const { generateEmbedding } = await import('../services/embedding.js');
+            const { learnTrack } = await import('../services/lyrics.js');
 
             for (const track of playlist.tracks) {
-                try {
-                    // Check if we already know this track
-                    const exists = await prisma.trackKnowledge.findUnique({
-                        where: { title_artist: { title: track.name, artist: track.artist } }
-                    });
-
-                    if (!exists) {
-                        const lyrics = await fetchLyrics(track.name, track.artist);
-                        if (lyrics) {
-                            const embedding = await generateEmbedding(lyrics);
-
-                            // Save to Knowledge Base
-                            await prisma.$executeRaw`
-                                INSERT INTO "TrackKnowledge" (id, title, artist, lyrics, "lyricsEmbedding", "updatedAt")
-                                VALUES (gen_random_uuid(), ${track.name}, ${track.artist}, ${lyrics}, ${embedding}::vector, NOW())
-                             `;
-                            console.log(`[RAG] Learned lyrics for: "${track.name}"`);
-                        }
-                    }
-                } catch (err) {
-                    console.error(`[RAG] Failed to learn track "${track.name}":`, err.message);
-                }
+                // Background learning with AI reason fallback
+                // Note: playlists might not have ai_reason yet, we pass null as context if so
+                await learnTrack(track.name, track.artist, track.ai_reason || "User saved playlist track.");
             }
             console.log('[RAG] Learning cycle complete.');
         })();

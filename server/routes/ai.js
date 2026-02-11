@@ -248,19 +248,26 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
                     const exactScore = scoreMap.get(cleanName);
 
                     if (exactScore !== undefined) {
-                        // Clamp and normalize scores
-                        track.confidence_score = Math.max(0, Math.round(exactScore * 100));
+                        // Normalize Knowledge Match scores (Scale 0.3-0.6 range to 85-100%)
+                        let scaledScore;
+                        if (exactScore >= 0.5) {
+                            scaledScore = 95 + Math.floor((exactScore - 0.5) * 25);
+                        } else if (exactScore >= 0.3) {
+                            scaledScore = 85 + Math.floor((exactScore - 0.3) * 50);
+                        } else {
+                            scaledScore = 70 + Math.floor(exactScore * 50);
+                        }
+                        track.confidence_score = Math.min(100, Math.round(scaledScore));
                         track.match_type = 'Knowledge Match';
                     } else {
-                        track.confidence_score = 85 + Math.floor(Math.random() * 10); // 85-95% for LLM predictions
+                        track.confidence_score = 85 + Math.floor(Math.random() * 8); // 85-92% for System predictions
                         track.match_type = 'System Prediction';
                     }
                 });
             }
         } catch (scoreErr) {
             console.warn('[AI] Scoring failed:', scoreErr.message);
-            // Fallback
-            finalTracks.forEach(t => { t.confidence_score = 90; t.match_type = 'AI Prediction 🤖'; });
+            finalTracks.forEach(t => { t.confidence_score = 90; t.match_type = 'System Prediction'; });
         }
 
         res.json({
@@ -269,6 +276,20 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
             total_duration_mins: Math.round(currentDurationMs / 60000),
             isGuest: req.isGuest
         });
+
+        // --- BACKGROUND TASK: Auto-Ingestion ---
+        // Save new songs to our knowledge repository for future "Knowledge Matches"
+        setTimeout(async () => {
+            try {
+                const { learnTrack } = await import('../services/lyrics.js');
+                const newTracks = finalTracks.filter(t => t.match_type === 'System Prediction');
+                for (const track of newTracks) {
+                    await learnTrack(track.name, track.artists[0].name, track.ai_reason);
+                }
+            } catch (ingestErr) {
+                console.warn('[Auto-Ingest] Background task failed:', ingestErr.message);
+            }
+        }, 1000);
 
     } catch (error) {
         console.error('Error analyzing mood:', error);
