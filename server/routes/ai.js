@@ -1,5 +1,5 @@
 import express from 'express';
-import { generatePlaylistParams, analyzeImage, generateVibeAnalysis } from '../services/groq.js';
+import { generatePlaylistParams, analyzeImage, generateVibeAnalysis, extractMusicalKeywords } from '../services/groq.js';
 import { generateImage } from '../services/imagen.js';
 import { generateEmbedding } from '../services/embedding.js';
 import { initSpotifyApi } from '../middleware/spotifyAuth.js';
@@ -48,58 +48,57 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
         let vibeEmbedding = null;
         let similarPlaylistsContext = "";
 
+
+        // Extract musical keywords AND vibe parameters
+        const analysis = await extractMusicalKeywords(mood);
+        const musicalKeywords = analysis.keywords;
+        console.log(`[RAG] Optimized Query: "${musicalKeywords}"`);
+        console.log(`[RAG] Vibe Filters: Valence [${analysis.min_valence}-${analysis.max_valence}], Energy [${analysis.min_energy}-${analysis.max_energy}]`);
+
         try {
-            // Generate embedding for the user's prompt (mood)
-            vibeEmbedding = await generateEmbedding(mood);
+            // Generate embedding for the OPTIMIZED keywords
+            vibeEmbedding = await generateEmbedding(musicalKeywords);
             console.log('[RAG] Generated embedding for prompt.');
 
             // --- STEP 2: HYBRID RETRIEVAL (Semantic + Metadata) ---
-            // Find playlists that match the Vibe (Vector) AND the Energy/Tempo (Metadata)
 
-            // Raw SQL for pgvector similarity search
-            // Using Cosine Distance (<=>): Lower is better match
-
-            // Build metadata filters
+            // Build metadata filters for Playlists (existing logic)
             let energyFilter = "";
             let tempoFilter = "";
-
-            // Tolerances: Energy ±0.2, Tempo ±20 BPM
             if (energy !== undefined) {
-                // energy is 0-100 from frontend, DB is 0-1
                 const targetEnergy = energy / 100;
                 energyFilter = `AND "avgEnergy" BETWEEN ${targetEnergy - 0.2} AND ${targetEnergy + 0.2}`;
             }
             if (tempo !== undefined) {
-                // tempo is 0-100 (slider), map to ~60-180 BPM or raw BPM if provided?
-                // Assuming frontend sends raw 0-100 slider, let's map it roughly: 0=60, 100=180
                 const targetBPM = 60 + (tempo * 1.2);
                 tempoFilter = `AND "avgTempo" BETWEEN ${targetBPM - 20} AND ${targetBPM + 20}`;
             }
 
-            // Only query if we have an embedding
-            const vectorQuery = `
-                SELECT name, description, tracks, 1 - (embedding <=> $1::vector) as similarity
-                FROM "Playlist"
-                WHERE isPublic = true
-                ${energyFilter}
-                ${tempoFilter}
-                ORDER BY embedding <=> $1::vector
-                LIMIT 3;
-            `;
-
-            // Note: Use a prepared statement or extensive sanitization in prod. 
-            // For now, we trust internal inputs or use Prisma's raw params strictly.
-            // Prisma defines variables as $1, $2 etc.
-
             // Execute Vibe Search (Playlists)
             const similarPlaylists = await prisma.$queryRawUnsafe(
-                `SELECT name, description, tracks FROM "Playlist" WHERE "isPublic" = true ORDER BY embedding <=> $1::vector LIMIT 3`,
+                `SELECT name, description, tracks FROM "Playlist" WHERE "isPublic" = true ${energyFilter} ${tempoFilter} ORDER BY embedding <=> $1::vector LIMIT 3`,
                 `[${vibeEmbedding.join(',')}]`
             );
 
-            // Execute Lyrical Search (TrackKnowledge)
+            // Build metadata filters for TrackKnowledge (NEW)
+            let trackFilters = "";
+            if (analysis.min_valence !== null && analysis.max_valence !== null) {
+                trackFilters += ` AND (valence IS NULL OR (valence >= ${analysis.min_valence} AND valence <= ${analysis.max_valence}))`;
+            }
+            if (analysis.min_energy !== null && analysis.max_energy !== null) {
+                trackFilters += ` AND (energy IS NULL OR (energy >= ${analysis.min_energy} AND energy <= ${analysis.max_energy}))`;
+            }
+
+            // Execute Lyrical Search (TrackKnowledge) with Vibe Filters
+            // Note: We allow NULLs to appear if we haven't enriched them yet, or strict mode?
+            // "OR valence IS NULL" ensures we don't hide unlearnt songs, but "Stage A" goal is to hide mismatches.
+            // Let's being strict: If filter exists, ONLY show matching songs. 
+            // BUT, initially many songs are NULL. So let's include NULLs for now to avoid empty results.
+
             const lyricMatches = await prisma.$queryRawUnsafe(
-                `SELECT title, artist, lyrics FROM "TrackKnowledge" ORDER BY "lyricsEmbedding" <=> $1::vector LIMIT 3`,
+                `SELECT title, artist, lyrics FROM "TrackKnowledge" 
+                 WHERE 1=1 ${trackFilters}
+                 ORDER BY "lyricsEmbedding" <=> $1::vector LIMIT 3`,
                 `[${vibeEmbedding.join(',')}]`
             );
 
@@ -222,30 +221,39 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
             const titles = finalTracks.map(t => t.name);
             // safe query using Prisma raw
             if (titles.length > 0) {
-                // Fix: Case-insensitive match for Vector Scores
+                // Normalize Titles (Remove "From...", "feat...", "- LoFi") to match track data
+                const cleanTitleMap = new Map();
+                const cleanTitles = titles.map(t => {
+                    // Remove text in parens/brackets, remove "feat.", remove " - "
+                    const clean = t.split('(')[0].split('[')[0].split('-')[0].split('feat.')[0].trim().toLowerCase();
+                    cleanTitleMap.set(clean, t); // Map clean title back to original
+                    return clean;
+                });
+
+                // SQL Query using Normalized Titles
                 const vectorScores = await prisma.$queryRawUnsafe(
                     `SELECT title, 1 - ("lyricsEmbedding" <=> $1::vector) as score 
                    FROM "TrackKnowledge" 
-                   WHERE LOWER(title) IN (${titles.map(t => `'${t.toLowerCase().replace(/'/g, "''")}'`).join(',')})`,
+                   WHERE LOWER(title) IN (${cleanTitles.map(t => `'${t.replace(/'/g, "''")}'`).join(',')})`,
                     `[${vibeEmbedding.join(',')}]`
                 );
 
-                // Map scores back to tracks (using lower case keys)
+                // Map scores back to tracks using clean titles
                 const scoreMap = new Map();
                 vectorScores.forEach(s => scoreMap.set(s.title.toLowerCase(), s.score));
 
                 finalTracks.forEach(track => {
-                    const exactScore = scoreMap.get(track.name.toLowerCase());
-                    // If we have a vector score, use it. If not, it's an "AI Prediction" which we assign an estimated high confidence (it came from Llama 3)
-                    // Vector score is usually 0.3-0.5 for good matches. Let's normalize it to 0-100 visually.
-                    // Real vector similarity of 0.4 is actually very high. 
-                    // Let's store the RAW score for accuracy, Frontend can format it.
-                    if (exactScore) {
-                        track.confidence_score = Math.round(exactScore * 100);
-                        track.match_type = 'Vector Match 🧬';
+                    // Clean the track name for lookup
+                    const cleanName = track.name.split('(')[0].split('[')[0].split('-')[0].split('feat.')[0].trim().toLowerCase();
+                    const exactScore = scoreMap.get(cleanName);
+
+                    if (exactScore !== undefined) {
+                        // Clamp and normalize scores
+                        track.confidence_score = Math.max(0, Math.round(exactScore * 100));
+                        track.match_type = 'Knowledge Match';
                     } else {
                         track.confidence_score = 85 + Math.floor(Math.random() * 10); // 85-95% for LLM predictions
-                        track.match_type = 'AI Prediction 🤖';
+                        track.match_type = 'System Prediction';
                     }
                 });
             }

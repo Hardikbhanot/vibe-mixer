@@ -234,3 +234,45 @@ export const generateVibeAnalysis = async (topArtists, topTracks) => {
         return { bio: "Music lover with a mysterious vibe. 🎵", tags: ["Eclectic"] };
     }
 };
+
+
+export const extractMusicalKeywords = async (userPrompt) => {
+    console.log('[Groq] Extracting musical keywords and vibe parameters...');
+    const prompt = `
+    Analyze this user request for a music search.
+    1. Extract 5-10 musical search keywords (genre, mood, instrument, lyrical themes).
+    2. Determine target Audio Features ranges (Valence: 0.0-1.0, Energy: 0.0-1.0).
+       - Valence: Low (0.0-0.4) = Sad/Dark, High (0.6-1.0) = Happy/Positive
+       - Energy: Low (0.0-0.4) = Calm/Chill, High (0.6-1.0) = Intense/Fast/Party
+    
+    User Request: "${userPrompt}"
+    
+    Output JSON ONLY:
+    {
+      "keywords": "string of keywords separated by spaces",
+      "min_valence": 0.0, // float or null if undefined
+      "max_valence": 1.0, // float or null if undefined
+      "min_energy": 0.0, // float or null if undefined
+      "max_energy": 1.0 // float or null if undefined
+    }
+    `;
+
+    try {
+        const completion = await callGroqWithFallback([
+            { role: "system", content: "You are a music analysis bot. Output valid JSON only." },
+            { role: "user", content: prompt },
+        ], "llama-3.3-70b-versatile", 0.5, true); // JSON mode enabled
+
+        const content = completion.choices[0]?.message?.content;
+        console.log(`[Groq] Vibe Analysis: ${content}`);
+        const result = JSON.parse(content);
+
+        // Ensure keywords exist
+        if (!result.keywords) result.keywords = userPrompt;
+
+        return result;
+    } catch (error) {
+        console.error("Keyword extraction failed:", error);
+        return { keywords: userPrompt, min_valence: null, max_valence: null, min_energy: null, max_energy: null };
+    }
+};

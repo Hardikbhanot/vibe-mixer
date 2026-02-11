@@ -154,8 +154,19 @@ model TrackKnowledge {
   artist          String
   lyrics          String   @db.Text
   
+
+
   // Semantic Vector of the lyrics
   lyricsEmbedding Unsupported("vector(768)")?
+  
+  // Spotify Audio Features (New)
+  spotifyId       String? 
+  valence         Float?   // 0.0 to 1.0 (Sad -> Happy)
+  energy          Float?   // 0.0 to 1.0 (Low -> High)
+  danceability    Float?   // 0.0 to 1.0
+  acousticness    Float?   // 0.0 to 1.0
+  tempo           Float?   // BPM
+  instrumentalness Float?  // 0.0 to 1.0
   
   updatedAt       DateTime @updatedAt
 

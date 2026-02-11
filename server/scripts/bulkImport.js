@@ -47,9 +47,9 @@ async function generateEmbeddingSafely(text) {
     }
 }
 
-// 5GB Limit Safeguard
+// Storage Limit Safeguard
 const MAX_SONGS = 500000;
-const MIN_VIEWS = 100000; // Only import HITS (100k+ views) to finish in ~2 days instead of 20
+const MIN_VIEWS = 100000; // Prioritize high-impact tracks (100k+ views)
 
 let processedCount = 0;
 
@@ -68,7 +68,7 @@ async function processRow(row) {
     }
 
     if (processedCount >= MAX_SONGS) {
-        console.log('[LIMIT] Max songs reached. Stopping import.');
+        console.log('[INFO] Reached storage limit. Stopping.');
         process.exit(0);
     }
 

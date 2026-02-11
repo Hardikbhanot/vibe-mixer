@@ -70,7 +70,6 @@ export default function RootLayout({
           </AuthProvider>
         </ThemeProvider>
       </body>
-      {/* 2. Add Google Analytics with your ID */}
       <GoogleAnalytics gaId="G-4H7R4JH136" />
     </html>
   );

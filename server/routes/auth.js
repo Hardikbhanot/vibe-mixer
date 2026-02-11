@@ -268,7 +268,12 @@ router.get('/callback', async (req, res) => {
         const { access_token, refresh_token, expires_in } = data.body;
 
         const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+
         console.log('[Spotify Callback] Success via Spotify API');
+        console.log('------------------------------------------------');
+        console.log('🔑 YOUR SPOTIFY REFRESH TOKEN (Copy to .env):');
+        console.log(refresh_token);
+        console.log('------------------------------------------------');
 
         // Fetch User Profile from Spotify to link/create account
         spotifyApi.setAccessToken(access_token);
