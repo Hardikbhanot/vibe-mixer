@@ -1,6 +1,7 @@
 import express from 'express';
 import { google } from 'googleapis';
 import { getRegionalVibeQuery } from '../services/groq.js';
+import { rotator } from '../services/youtube.js';
 
 const router = express.Router();
 
@@ -185,13 +186,14 @@ router.get('/region-vibe', async (req, res) => {
     try {
         console.log(`[Region Vibe] Request for region: ${region}`);
 
-        const youtube = google.youtube({
-            version: 'v3',
-            auth: process.env.GOOGLE_API_KEY
-        });
+        // Use the centralized rotator for quota-aware searching
+        const youtube = rotator.getInstance();
+        if (!youtube) {
+            return res.status(500).json({ error: 'YouTube API not configured' });
+        }
 
         // 1. Get AI Optimized Query
-        let searchQuery = `Best ${region} songs india`; // Default
+        let searchQuery = `Best ${region} songs india`; 
         try {
             const aiData = await getRegionalVibeQuery(region);
             if (aiData.searchQuery) {
@@ -201,13 +203,13 @@ router.get('/region-vibe', async (req, res) => {
             console.error('AI Curation failed, using default query', e);
         }
 
-        // 2. Search YouTube (Single Request = 100 Quota Units)
+        // 2. Search YouTube (Uses Centralized Rotator)
         console.log(`[Region Vibe] Searching YouTube with query: "${searchQuery}"`);
 
         const searchRes = await youtube.search.list({
             part: ['snippet'],
             q: searchQuery,
-            maxResults: 20, // Fetch more to allow filtering
+            maxResults: 20, 
             type: 'video',
         });
 

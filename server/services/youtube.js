@@ -3,19 +3,66 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const youtube = google.youtube({
-    version: 'v3',
-    auth: process.env.GOOGLE_API_KEY
-});
+/**
+ * YouTube API Key Rotator
+ * Handles switching between multiple API keys when quota is reached.
+ */
+class YouTubeRotator {
+    constructor() {
+        // Load keys from GOOGLE_API_KEY (comma separated) or fallback to individual variables
+        const rawKeys = process.env.GOOGLE_API_KEYS || process.env.GOOGLE_API_KEY;
+        this.keys = rawKeys ? rawKeys.split(',').map(k => k.trim()) : [];
+        this.currentIndex = 0;
+        this.instances = new Map();
+
+        console.log(`[YouTube Rotator] Initialized with ${this.keys.length} keys.`);
+    }
+
+    get currentKey() {
+        return this.keys[this.currentIndex];
+    }
+
+    getInstance() {
+        const key = this.currentKey;
+        if (!key) return null;
+
+        if (!this.instances.has(key)) {
+            this.instances.set(key, google.youtube({
+                version: 'v3',
+                auth: key
+            }));
+        }
+        return this.instances.get(key);
+    }
+
+    rotate() {
+        if (this.keys.length <= 1) return false;
+        
+        this.currentIndex = (this.currentIndex + 1) % this.keys.length;
+        console.warn(`[YouTube Rotator] 🔄 Switched to Key Index ${this.currentIndex} due to Quota/Error.`);
+        return true;
+    }
+
+    get hasKeys() {
+        return this.keys.length > 0;
+    }
+}
+
+export const rotator = new YouTubeRotator();
 
 /**
  * Searches YouTube for a song and returns metadata formatted like a Spotify track object.
- * @param {string} query - The search query (e.g. "Song Name Artist Name")
- * @returns {Promise<Object|null>} - A mocked Spotify track object derived from YouTube data.
+ * Implements retry logic for Quota rotation.
  */
-export const searchYouTube = async (query) => {
+export const searchYouTube = async (query, retryCount = 0) => {
     try {
-        console.log(`[YouTube] 🔍 Searching for: "${query}"`);
+        const youtube = rotator.getInstance();
+        if (!youtube) {
+            console.error('[YouTube] No API keys configured.');
+            return null;
+        }
+
+        console.log(`[YouTube] 🔍 Searching (Key ${rotator.currentIndex}): "${query}"`);
         
         const response = await youtube.search.list({
             part: ['snippet'],
@@ -33,17 +80,15 @@ export const searchYouTube = async (query) => {
         const video = response.data.items[0];
         const snippet = video.snippet;
 
-        // Clean up title (YouTube often adds "Official Video" etc)
         const cleanTitle = snippet.title
             .replace(/\(Official.*?\)/gi, '')
             .replace(/\[Official.*?\]/gi, '')
             .replace(/ft\..*/gi, '')
             .trim();
 
-        // Construct a "Mock Spotify Track" object so the frontend doesn't break
         return {
-            id: video.id.videoId, // Use raw ID
-            videoId: video.id.videoId, // Explicit field for save-to-playlist logic
+            id: video.id.videoId,
+            videoId: video.id.videoId,
             name: cleanTitle,
             artists: [{ name: snippet.channelTitle.replace(' - Topic', '') }],
             album: {
@@ -58,13 +103,23 @@ export const searchYouTube = async (query) => {
             is_youtube: true 
         };
     } catch (error) {
-        console.error('[YouTube] Search error:', error.message);
-        // Specifically throw quota errors so the caller can stop searching
-        if (error.code === 403 || error.message.includes('quota')) {
-            const quotaErr = new Error('YouTube Quota Exceeded');
+        // Quota errors are usually 403 or have 'quota' in message
+        const isQuotaError = error.code === 403 || (error.errors && error.errors[0]?.reason === 'quotaExceeded') || error.message.toLowerCase().includes('quota');
+
+        if (isQuotaError) {
+            console.warn(`[YouTube] Key ${rotator.currentIndex} Quota Exceeded.`);
+            
+            // Try to rotate
+            if (rotator.rotate() && retryCount < rotator.keys.length) {
+                return await searchYouTube(query, retryCount + 1);
+            }
+
+            const quotaErr = new Error('All YouTube API Quotas Exceeded');
             quotaErr.code = 'QUOTA_EXCEEDED';
             throw quotaErr;
         }
+
+        console.error('[YouTube] Search error:', error.message);
         return null;
     }
 };
