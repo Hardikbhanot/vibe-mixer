@@ -42,3 +42,8 @@ google-key.json
 server/data/lyrics.csv
 *.csv
 ./server/data/lyrics.csv
+
+# Debug & Temp
+server/out.json
+server/test*
+test_image.jpg
