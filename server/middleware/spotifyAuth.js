@@ -50,21 +50,32 @@ export const initSpotifyApi = async (req, res, next) => {
         }
     };
 
+    // --- ALWAYS ADD A GUEST INSTANCE (For public search if User token is restricted) ---
+    try {
+        const guestApi = new SpotifyWebApi({
+            clientId: process.env.SPOTIFY_CLIENT_ID,
+            clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+        });
+        const guestData = await guestApi.clientCredentialsGrant();
+        guestApi.setAccessToken(guestData.body['access_token']);
+        req.guestSpotifyApi = guestApi;
+        console.log('[Auth Middleware] Guest instance prepared (Backup).');
+    } catch (gErr) {
+        console.warn('[Auth Middleware] Guest Backup Instance failed:', gErr.message);
+    }
+
+
     // Case 1: No tokens at all -> Guest Mode
     if (!accessToken && !refreshToken) {
         // ... (Guest Logic - Keep existing)
         console.log('[Auth Middleware] No tokens found - Using Client Credentials Flow (Guest Mode)');
         try {
-            const data = await spotifyApi.clientCredentialsGrant();
-            const guestAccessToken = data.body['access_token'];
-
-            spotifyApi.setAccessToken(guestAccessToken);
-            req.spotifyApi = spotifyApi;
+            req.spotifyApi = req.guestSpotifyApi;
             req.isGuest = true;
             return next();
         } catch (error) {
-            console.error('[Auth Middleware] Client Credentials Grant failed:', error);
-            return res.status(500).json({ error: 'Failed to initialize Spotify API for guest' });
+            console.error('[Auth Middleware] Global Guest Fallback failed:', error);
+            return res.status(500).json({ error: 'Failed to initialize Spotify API' });
         }
     }
 
@@ -79,11 +90,7 @@ export const initSpotifyApi = async (req, res, next) => {
             // Fallback to Guest
             console.log('[Auth Middleware] Refresh failed - Falling back to Guest Mode');
             try {
-                const data = await spotifyApi.clientCredentialsGrant();
-                const guestAccessToken = data.body['access_token'];
-
-                spotifyApi.setAccessToken(guestAccessToken);
-                req.spotifyApi = spotifyApi;
+                req.spotifyApi = req.guestSpotifyApi;
                 req.isGuest = true;
                 return next();
             } catch (ccError) {

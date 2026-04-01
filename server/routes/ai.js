@@ -3,6 +3,7 @@ import { generatePlaylistParams, analyzeImage, generateVibeAnalysis, extractMusi
 import { generateImage } from '../services/imagen.js';
 import { generateEmbedding } from '../services/embedding.js';
 import { initSpotifyApi } from '../middleware/spotifyAuth.js';
+import { searchYouTube } from '../services/youtube.js';
 import { authenticateToken } from '../middleware/auth.js';
 import multer from 'multer';
 import { PrismaClient } from '@prisma/client';
@@ -180,21 +181,51 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
         const aiParams = await generatePlaylistParams(mood, vibeType, targetTrackCount, { energy, tempo, valence }, combinedContext, model);
         console.log('AI Params Generated');
 
-        // 2. Search Spotify for each suggested track
+        // 2. Search Spotify for each suggested track (with YouTube Fallback)
         const trackPromises = aiParams.suggested_tracks.map(async (suggestion) => {
+            const query = `${suggestion.song} ${suggestion.artist}`;
             try {
-                const query = `track:${suggestion.song} artist:${suggestion.artist}`;
-                const searchResult = await req.spotifyApi.searchTracks(query, { limit: 1 });
+                let searchResult;
+                try {
+                    searchResult = await req.spotifyApi.searchTracks(query, { limit: 1 });
+                } catch (firstErr) {
+                    // --- FALLBACK: If User token fails with 403/401, use Guest instance ---
+                    if ((firstErr.statusCode === 403 || firstErr.statusCode === 401) && req.guestSpotifyApi) {
+                        console.warn(`[Spotify] User Search failed (${firstErr.statusCode}). Falling back to Guest Instance...`);
+                        searchResult = await req.guestSpotifyApi.searchTracks(query, { limit: 1 });
+                    } else {
+                        throw firstErr;
+                    }
+                }
 
-                if (searchResult.body.tracks.items.length > 0) {
+                if (searchResult && searchResult.body.tracks.items.length > 0) {
                     const spotifyTrack = searchResult.body.tracks.items[0];
                     return {
                         ...spotifyTrack,
                         ai_reason: suggestion.reason || "Fits the vibe perfectly."
                     };
                 }
+                
+                // --- CRITICAL FALLBACK: If Spotify (Guest or User) yields 0 results or fails, use YouTube ---
+                console.warn(`[Spotify] 0 results for: "${query}". Triggering YouTube Fallback...`);
+                const ytTrack = await searchYouTube(query);
+                if (ytTrack) {
+                    return {
+                        ...ytTrack,
+                        ai_reason: suggestion.reason || "Found via YouTube due to Spotify restrictions."
+                    };
+                }
+
                 return null;
             } catch (err) {
+                console.error(`[Spotify/YouTube] Search Failed for "${query}":`, err.message);
+                
+                // Final Last-Ditch Fallback: Try YouTube one more time if the earlier error stopped the chain
+                try {
+                    const ytTrack = await searchYouTube(query);
+                    if (ytTrack) return { ...ytTrack, ai_reason: suggestion.reason };
+                } catch (ytErr) { }
+
                 return null;
             }
         });
