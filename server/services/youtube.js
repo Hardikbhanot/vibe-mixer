@@ -42,22 +42,29 @@ export const searchYouTube = async (query) => {
 
         // Construct a "Mock Spotify Track" object so the frontend doesn't break
         return {
-            id: `yt_${video.id.videoId}`,
+            id: video.id.videoId, // Use raw ID
+            videoId: video.id.videoId, // Explicit field for save-to-playlist logic
             name: cleanTitle,
             artists: [{ name: snippet.channelTitle.replace(' - Topic', '') }],
             album: {
                 name: "YouTube Music",
                 images: [{ url: snippet.thumbnails.high.url }]
             },
-            duration_ms: 180000, // Fallback duration (3 mins)
+            duration_ms: 180000, 
             external_urls: {
                 spotify: `https://www.youtube.com/watch?v=${video.id.videoId}`
             },
             preview_url: null,
-            is_youtube: true // Flag for the frontend to know this isn't a real Spotify track
+            is_youtube: true 
         };
     } catch (error) {
         console.error('[YouTube] Search error:', error.message);
+        // Specifically throw quota errors so the caller can stop searching
+        if (error.code === 403 || error.message.includes('quota')) {
+            const quotaErr = new Error('YouTube Quota Exceeded');
+            quotaErr.code = 'QUOTA_EXCEEDED';
+            throw quotaErr;
+        }
         return null;
     }
 };

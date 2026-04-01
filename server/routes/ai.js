@@ -218,13 +218,21 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
 
                 return null;
             } catch (err) {
-                console.error(`[Spotify/YouTube] Search Failed for "${query}":`, err.message);
+                const errMsg = err.message || JSON.stringify(err);
+                console.error(`[Spotify/YouTube] Search Failed for "${query}":`, errMsg);
                 
+                // If YouTube quota is hit, don't try the last-ditch fallback
+                if (err.code === 'QUOTA_EXCEEDED') {
+                    return null;
+                }
+
                 // Final Last-Ditch Fallback: Try YouTube one more time if the earlier error stopped the chain
                 try {
                     const ytTrack = await searchYouTube(query);
                     if (ytTrack) return { ...ytTrack, ai_reason: suggestion.reason };
-                } catch (ytErr) { }
+                } catch (ytErr) { 
+                    // Silent catch for last-ditch attempt
+                }
 
                 return null;
             }
