@@ -1,0 +1,75 @@
+name: VibeMixer Server CI/CD
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "server/**"
+      - ".github/workflows/server-deploy.yml"
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lowercase image name
+        run: |
+          echo "IMAGE_NAME_LC=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LC }}/server:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LC }}:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to VM via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 137.23.60.224
+          username: ubuntu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+
+            mkdir -p /home/vibe-mixer
+
+            echo "${{ secrets.GH_PAT }}" | docker login ghcr.io \
+              -u ${{ github.actor }} \
+              --password-stdin
+
+            docker pull ghcr.io/${{ github.repository_owner }}/vibe-mixer/server:latest
+
+            docker stop vibe-mixer-server || true
+            docker rm vibe-mixer-server || true
+
+            docker run -d \
+              --name vibe-mixer-server \
+              --restart always \
+              -p 4000:4000 \
+              ghcr.io/${{ github.repository_owner }}/vibe-mixer/server:latest
+
+            docker image prune -f
