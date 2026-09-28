@@ -8,7 +8,7 @@ import { generateEmbedding } from './embedding.js';
 
 dotenv.config();
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite-001" });
 
 async function getGeniusLyrics(title, artist) {
@@ -54,7 +54,7 @@ export const fetchLyrics = async (title, artist) => {
         if (lyrics.length > 50) return lyrics;
     } catch (e) { }
 
-    if (!process.env.GOOGLE_API_KEY) return null;
+    if (!process.env.GEMINI_API_KEY) return null;
     try {
         console.log(`[Lyrics] 🧠 Tier 3: Gemini for "${title}"...`);
         const prompt = `Return lyrics for "${title}" by "${artist}". Text only.`;
