@@ -33,23 +33,54 @@ router.get('/feed', authenticateToken, initSpotifyApi, async (req, res) => {
             seenSet.add(`${s.songName.toLowerCase()}:${s.artistName.toLowerCase()}`);
         });
 
-        // 2. Search Spotify for a Mix (Guaranteed Variety)
-        const categories = {
-            hindiNew: ['hindi new', 'bollywood hits', 'punjabi 2024', 'trending india', 'arijit singh'],
-            hindiOld: ['bollywood 90s', 'bollywood 2000s', 'kishore kumar', 'lat mangeshkar', 'old hindi songs'],
-            englishNew: ['genre:pop', 'viral hits', 'top 50 global', 'genre:r-n-b'],
-            englishOld: ['year:1990-2010 pop', '90s hits', 'classic rock', 'year:2000-2010']
-        };
+        // 2. Build Search Queries (RAG-Powered if history exists, fallback to Generic)
+        let selectedQueries = [];
 
-        const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+        try {
+            if (swipedSongs.length > 0) {
+                // RAG-POWERED DISCOVERY
+                // Pick a random recently liked song to find similar semantic vibes
+                const seedSong = swipedSongs[Math.floor(Math.random() * swipedSongs.length)];
+                
+                // Find its embedding in TrackKnowledge
+                const knownTrack = await prisma.trackKnowledge.findFirst({
+                    where: { 
+                        title: { equals: seedSong.songName, mode: 'insensitive' }
+                    },
+                    select: { lyricsEmbedding: true }
+                });
 
-        // Select one from each category to ensure the user's requested "variety"
-        const selectedQueries = [
-            pickRandom(categories.hindiNew),
-            pickRandom(categories.hindiOld),
-            pickRandom(categories.englishNew),
-            pickRandom(categories.englishOld)
-        ];
+                if (knownTrack && knownTrack.lyricsEmbedding) {
+                    // Vector Search for 10 semantically similar tracks!
+                    const similarTracks = await prisma.$queryRawUnsafe(
+                        `SELECT title, artist FROM "TrackKnowledge" 
+                         ORDER BY "lyricsEmbedding" <=> $1::vector LIMIT 10`,
+                        `[${knownTrack.lyricsEmbedding.join(',')}]`
+                    );
+                    
+                    selectedQueries = similarTracks.map(t => `${t.title} ${t.artist}`);
+                }
+            }
+        } catch (ragErr) {
+            console.error('[Swipe Feed] RAG Vector Search failed, falling back to generic:', ragErr);
+        }
+
+        if (selectedQueries.length === 0) {
+            // GENERIC FALLBACK (If no history or RAG failed)
+            const categories = {
+                hindiNew: ['hindi new', 'bollywood hits', 'punjabi 2024', 'trending india', 'arijit singh'],
+                hindiOld: ['bollywood 90s', 'bollywood 2000s', 'kishore kumar', 'lat mangeshkar', 'old hindi songs'],
+                englishNew: ['genre:pop', 'viral hits', 'top 50 global', 'genre:r-n-b'],
+                englishOld: ['year:1990-2010 pop', '90s hits', 'classic rock', 'year:2000-2010']
+            };
+            const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+            selectedQueries = [
+                pickRandom(categories.hindiNew),
+                pickRandom(categories.hindiOld),
+                pickRandom(categories.englishNew),
+                pickRandom(categories.englishOld)
+            ];
+        }
 
         let candidates = [];
 

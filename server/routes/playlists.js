@@ -294,4 +294,34 @@ router.get('/:id/is-liked', authenticateToken, async (req, res) => {
     }
 });
 
+// 9. Get Similar Playlists (RAG-Powered Discovery)
+router.get('/similar/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const targetPlaylist = await prisma.playlist.findUnique({
+            where: { id },
+            select: { embedding: true, isPublic: true }
+        });
+
+        if (!targetPlaylist || !targetPlaylist.isPublic || !targetPlaylist.embedding) {
+            return res.json({ playlists: [] });
+        }
+
+        // Vector Search for 5 similar public playlists
+        const similarPlaylists = await prisma.$queryRawUnsafe(
+            `SELECT id, name, description, "coverImage", "createdAt" 
+             FROM "Playlist" 
+             WHERE "isPublic" = true AND id != $2 
+             ORDER BY embedding <=> $1::vector LIMIT 5`,
+            `[${targetPlaylist.embedding.join(',')}]`,
+            id
+        );
+
+        res.json({ playlists: similarPlaylists });
+    } catch (error) {
+        console.error('Similar playlists RAG error:', error);
+        res.status(500).json({ error: 'Failed to find similar vibes' });
+    }
+});
+
 export default router;
