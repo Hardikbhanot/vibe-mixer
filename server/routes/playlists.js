@@ -299,7 +299,7 @@ router.get('/similar/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const targetPlaylists = await prisma.$queryRawUnsafe(
-            `SELECT "isPublic", embedding::text FROM "Playlist" WHERE id = $1::uuid LIMIT 1`,
+            `SELECT "isPublic", embedding::text FROM "Playlist" WHERE id = $1 LIMIT 1`,
             id
         );
         const targetPlaylist = targetPlaylists[0];
@@ -312,7 +312,7 @@ router.get('/similar/:id', async (req, res) => {
         const similarPlaylists = await prisma.$queryRawUnsafe(
             `SELECT id, name, description, "coverImage", "createdAt" 
              FROM "Playlist" 
-             WHERE "isPublic" = true AND id != $2::uuid 
+             WHERE "isPublic" = true AND id != $2 
              ORDER BY embedding <=> $1::vector LIMIT 5`,
             targetPlaylist.embedding,
             id
