@@ -298,10 +298,11 @@ router.get('/:id/is-liked', authenticateToken, async (req, res) => {
 router.get('/similar/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const targetPlaylist = await prisma.playlist.findUnique({
-            where: { id },
-            select: { embedding: true, isPublic: true }
-        });
+        const targetPlaylists = await prisma.$queryRawUnsafe(
+            `SELECT "isPublic", embedding::text FROM "Playlist" WHERE id = $1 LIMIT 1`,
+            id
+        );
+        const targetPlaylist = targetPlaylists[0];
 
         if (!targetPlaylist || !targetPlaylist.isPublic || !targetPlaylist.embedding) {
             return res.json({ playlists: [] });
@@ -313,7 +314,7 @@ router.get('/similar/:id', async (req, res) => {
              FROM "Playlist" 
              WHERE "isPublic" = true AND id != $2 
              ORDER BY embedding <=> $1::vector LIMIT 5`,
-            `[${targetPlaylist.embedding.join(',')}]`,
+            targetPlaylist.embedding,
             id
         );
 
