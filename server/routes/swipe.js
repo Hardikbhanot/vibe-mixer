@@ -44,7 +44,7 @@ router.get('/feed', authenticateToken, initSpotifyApi, async (req, res) => {
                 
                 // Find its embedding in TrackKnowledge using queryRaw (pgvector support)
                 const knownTracks = await prisma.$queryRawUnsafe(
-                    `SELECT "lyricsEmbedding" FROM "TrackKnowledge" 
+                    `SELECT "lyricsEmbedding"::text FROM "TrackKnowledge" 
                      WHERE LOWER(title) = LOWER($1) LIMIT 1`,
                     seedSong.songName
                 );
@@ -56,7 +56,7 @@ router.get('/feed', authenticateToken, initSpotifyApi, async (req, res) => {
                     const similarTracks = await prisma.$queryRawUnsafe(
                         `SELECT title, artist FROM "TrackKnowledge" 
                          ORDER BY "lyricsEmbedding" <=> $1::vector LIMIT 10`,
-                        `[${knownTrack.lyricsEmbedding.join(',')}]`
+                        knownTrack.lyricsEmbedding
                     );
                     
                     selectedQueries = similarTracks.map(t => `${t.title} ${t.artist}`);
