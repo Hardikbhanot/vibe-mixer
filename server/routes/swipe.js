@@ -81,7 +81,9 @@ router.get('/feed', authenticateToken, initSpotifyApi, async (req, res) => {
             } catch (err) {
                 console.warn(`[Swipe Feed] Spotify Search failed for ${q}. Falling back to YouTube...`);
                 try {
-                    const ytTracks = await searchYouTubeMultiple(q + " hit song", 5);
+                    const randomSuffixes = ["2023", "2024", "2025", "official video", "music video", "live", "lyrics", "hit song", "viral"];
+                    const suffix = randomSuffixes[Math.floor(Math.random() * randomSuffixes.length)];
+                    const ytTracks = await searchYouTubeMultiple(`${q} ${suffix}`, 5);
                     if (ytTracks && ytTracks.length > 0) {
                         candidates.push(...ytTracks);
                     }

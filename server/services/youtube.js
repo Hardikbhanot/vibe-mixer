@@ -136,7 +136,7 @@ export const searchYouTubeMultiple = async (query, limit = 5, retryCount = 0) =>
         const response = await youtube.search.list({
             part: ['snippet'],
             q: query,
-            maxResults: limit,
+            maxResults: 50, // Fetch max to get deep variety
             type: ['video'],
             videoCategoryId: '10',
             order: 'viewCount'
@@ -144,7 +144,12 @@ export const searchYouTubeMultiple = async (query, limit = 5, retryCount = 0) =>
 
         if (!response.data.items) return [];
 
-        return response.data.items.map(video => {
+        // Shuffle the 50 results so it's not always the exact same tracks on refresh
+        const shuffled = response.data.items.sort(() => 0.5 - Math.random());
+        // Pick only the requested limit
+        const selected = shuffled.slice(0, limit);
+
+        return selected.map(video => {
             const snippet = video.snippet;
             const cleanTitle = snippet.title.replace(/\(Official.*?\)/gi, '').replace(/\[Official.*?\]/gi, '').trim();
             return {
