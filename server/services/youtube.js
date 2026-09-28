@@ -123,3 +123,44 @@ export const searchYouTube = async (query, retryCount = 0) => {
         return null;
     }
 };
+
+/**
+ * Searches YouTube for multiple songs (Swipe Feed Fallback).
+ */
+export const searchYouTubeMultiple = async (query, limit = 5, retryCount = 0) => {
+    try {
+        const youtube = rotator.getInstance();
+        if (!youtube) return [];
+        
+        const response = await youtube.search.list({
+            part: ['snippet'],
+            q: query,
+            maxResults: limit,
+            type: ['video'],
+            videoCategoryId: '10'
+        });
+
+        if (!response.data.items) return [];
+
+        return response.data.items.map(video => {
+            const snippet = video.snippet;
+            const cleanTitle = snippet.title.replace(/\(Official.*?\)/gi, '').replace(/\[Official.*?\]/gi, '').trim();
+            return {
+                id: video.id.videoId,
+                videoId: video.id.videoId,
+                name: cleanTitle,
+                artists: [{ name: snippet.channelTitle.replace(' - Topic', '') }],
+                album: { name: "YouTube Music", images: [{ url: snippet.thumbnails.high.url }] },
+                duration_ms: 180000,
+                external_urls: { spotify: `https://www.youtube.com/watch?v=${video.id.videoId}` },
+                is_youtube: true
+            };
+        });
+    } catch (error) {
+        const isQuotaError = error.code === 403 || error.message.toLowerCase().includes('quota');
+        if (isQuotaError && rotator.rotate() && retryCount < rotator.keys.length) {
+            return await searchYouTubeMultiple(query, limit, retryCount + 1);
+        }
+        return [];
+    }
+};

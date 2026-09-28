@@ -2,6 +2,7 @@ import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth.js';
 import { initSpotifyApi } from '../middleware/spotifyAuth.js';
+import { searchYouTube, searchYouTubeMultiple } from '../services/youtube.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -61,12 +62,32 @@ router.get('/feed', authenticateToken, initSpotifyApi, async (req, res) => {
                 // Increase offset range for more variety (avoid repeats)
                 const offset = Math.floor(Math.random() * 100); // Reduced offset slightly to ensure results exist
 
-                const results = await req.spotifyApi.searchTracks(q, { limit, offset, market });
-                if (results.body.tracks) {
+                let results;
+                try {
+                    results = await req.spotifyApi.searchTracks(q, { limit, offset, market });
+                } catch (firstErr) {
+                    if ((firstErr.statusCode === 403 || firstErr.statusCode === 401) && req.guestSpotifyApi) {
+                        results = await req.guestSpotifyApi.searchTracks(q, { limit, offset, market });
+                    } else {
+                        throw firstErr;
+                    }
+                }
+
+                if (results && results.body.tracks && results.body.tracks.items.length > 0) {
                     candidates.push(...results.body.tracks.items);
+                } else {
+                    throw new Error("No Spotify results");
                 }
             } catch (err) {
-                console.error(`Search failed for ${q}:`, err);
+                console.warn(`[Swipe Feed] Spotify Search failed for ${q}. Falling back to YouTube...`);
+                try {
+                    const ytTracks = await searchYouTubeMultiple(q + " hit song", 5);
+                    if (ytTracks && ytTracks.length > 0) {
+                        candidates.push(...ytTracks);
+                    }
+                } catch (ytErr) {
+                    console.error(`[Swipe Feed] YouTube fallback failed for ${q}:`, ytErr);
+                }
             }
         }
 
