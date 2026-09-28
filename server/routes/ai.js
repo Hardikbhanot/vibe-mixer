@@ -99,7 +99,7 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
             const lyricMatches = await prisma.$queryRawUnsafe(
                 `SELECT title, artist, lyrics FROM "TrackKnowledge" 
                  WHERE 1=1 ${trackFilters}
-                 ORDER BY "lyricsEmbedding" <=> $1::vector LIMIT 3`,
+                 ORDER BY "lyricsEmbedding" <=> $1::vector LIMIT 15`,
                 `[${vibeEmbedding.join(',')}]`
             );
 
@@ -323,7 +323,8 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
                 const { learnTrack } = await import('../services/lyrics.js');
                 const newTracks = finalTracks.filter(t => t.match_type === 'System Prediction');
                 for (const track of newTracks) {
-                    await learnTrack(track.name, track.artists[0].name, track.ai_reason);
+                    const cleanTitle = track.name.split('(')[0].split('[')[0].split('-')[0].split('feat.')[0].trim();
+                    await learnTrack(cleanTitle, track.artists[0].name, track.ai_reason);
                 }
             } catch (ingestErr) {
                 console.warn('[Auto-Ingest] Background task failed:', ingestErr.message);
