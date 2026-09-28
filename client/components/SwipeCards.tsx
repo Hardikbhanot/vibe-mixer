@@ -33,6 +33,13 @@ const SwipeCards = ({ tracks, onEmpty }: SwipeCardsProps) => {
         return null;
     };
 
+    const getYoutubeUrl = (track: Track) => {
+        if (track.is_youtube && track.external_urls?.spotify) {
+            return track.external_urls.spotify;
+        }
+        return `https://www.youtube.com/results?search_query=${encodeURIComponent(track.name + ' ' + track.artists[0].name)}`;
+    };
+
     const handlePlay = (track: Track) => {
         const platform = localStorage.getItem('musicPlatform');
         const spotifyUrl = getSpotifyUrl(track);
@@ -40,7 +47,7 @@ const SwipeCards = ({ tracks, onEmpty }: SwipeCardsProps) => {
         if (platform === 'spotify' && spotifyUrl) {
             window.open(spotifyUrl, '_blank');
         } else if (platform === 'youtube') {
-            window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(track.name + ' ' + track.artists[0].name)}`, '_blank');
+            window.open(getYoutubeUrl(track), '_blank');
         } else {
             setSelectedTrack(track);
             setShowModal(true);
@@ -60,10 +67,10 @@ const SwipeCards = ({ tracks, onEmpty }: SwipeCardsProps) => {
                 } else {
                     // Fallback if we absolutely can't find a link
                     toast.error('Spotify link not available, searching YouTube instead');
-                    window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedTrack.name + ' ' + selectedTrack.artists[0].name)}`, '_blank');
+                    window.open(getYoutubeUrl(selectedTrack), '_blank');
                 }
             } else {
-                window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedTrack.name + ' ' + selectedTrack.artists[0].name)}`, '_blank');
+                window.open(getYoutubeUrl(selectedTrack), '_blank');
             }
         }
         setShowModal(false);

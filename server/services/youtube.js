@@ -70,6 +70,7 @@ export const searchYouTube = async (query, retryCount = 0) => {
             maxResults: 1,
             type: ['video'],
             videoCategoryId: '10', // Music category
+            order: 'viewCount',    // Ensures the most popular/official video is returned
         });
 
         if (!response.data.items || response.data.items.length === 0) {
@@ -137,7 +138,8 @@ export const searchYouTubeMultiple = async (query, limit = 5, retryCount = 0) =>
             q: query,
             maxResults: limit,
             type: ['video'],
-            videoCategoryId: '10'
+            videoCategoryId: '10',
+            order: 'viewCount'
         });
 
         if (!response.data.items) return [];
