@@ -38,6 +38,7 @@ interface PublicPlaylist {
 export default function PublicMixPage() {
     const params = useParams();
     const [playlist, setPlaylist] = useState<PublicPlaylist | null>(null);
+    const [similarPlaylists, setSimilarPlaylists] = useState<PublicPlaylist[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -64,6 +65,14 @@ export default function PublicMixPage() {
             const data = await res.json();
             setPlaylist(data);
             setLikeCount(data.likeCount || 0);
+
+            // Fetch similar playlists (RAG)
+            fetch(`${apiUrl}/api/playlists/similar/${id}`)
+                .then(r => r.json())
+                .then(d => {
+                    if (d.playlists) setSimilarPlaylists(d.playlists);
+                })
+                .catch(e => console.warn('Failed to fetch similar playlists', e));
 
             // Check if liked
             try {
@@ -360,6 +369,37 @@ export default function PublicMixPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* Similar Playlists (RAG-Powered) */}
+                {similarPlaylists.length > 0 && (
+                    <div className="mt-16 border-t border-foreground/10 pt-10">
+                        <h3 className="text-2xl font-black mb-2 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary">auto_awesome</span>
+                            Similar Vibes
+                        </h3>
+                        <p className="text-muted-foreground mb-6">Discover mathematically similar playlists curated by the community.</p>
+                        
+                        <div className="flex gap-4 overflow-x-auto pb-6 snap-x">
+                            {similarPlaylists.map(sp => (
+                                <Link href={`/mix/${sp.id}`} key={sp.id} className="snap-start shrink-0 w-48 group">
+                                    <div className="aspect-square relative rounded-xl overflow-hidden mb-3 bg-black/5">
+                                        <img 
+                                            src={sp.coverImage || '/placeholder.png'} 
+                                            alt={sp.name} 
+                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                        />
+                                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shadow-lg">
+                                                <span className="material-symbols-outlined">play_arrow</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <h4 className="font-bold truncate text-sm group-hover:text-primary transition-colors">{sp.name}</h4>
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </main>
         </div>
     );
