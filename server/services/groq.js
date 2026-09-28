@@ -7,8 +7,8 @@ const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY
 });
 
-const DEFAULT_MODEL = "llama-3.3-70b-versatile";
-const FALLBACK_MODEL = "llama-3.3-70b-versatile"; // Fallback is always the reliable one
+const DEFAULT_MODEL = "qwen/qwen3.8-27b";
+const FALLBACK_MODEL = "qwen/qwen3.8-27b"; // Fallback is always the reliable one
 
 // Helper for Model Fallback Logic
 const callGroqWithFallback = async (messages, preferredModel = DEFAULT_MODEL, temperature = 0.7, jsonMode = true) => {
@@ -175,7 +175,7 @@ export const analyzeImage = async (base64Image, mimeType = 'image/jpeg') => {
                     ],
                 },
             ],
-            model: "llama-3.2-11b-vision-instruct", // Guessing the instructor version exists
+            model: "qwen/qwen3.8-27b", // Updated vision model
             temperature: 0.5,
             max_tokens: 50,
         });
@@ -261,7 +261,7 @@ export const extractMusicalKeywords = async (userPrompt) => {
         const completion = await callGroqWithFallback([
             { role: "system", content: "You are a music analysis bot. Output valid JSON only." },
             { role: "user", content: prompt },
-        ], "llama-3.3-70b-versatile", 0.5, true); // JSON mode enabled
+        ], DEFAULT_MODEL, 0.5, true); // JSON mode enabled
 
         const content = completion.choices[0]?.message?.content;
         console.log(`[Groq] Vibe Analysis: ${content}`);
