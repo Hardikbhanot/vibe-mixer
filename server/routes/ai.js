@@ -148,7 +148,19 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
 
                 if (user && user.topArtists && Array.isArray(user.topArtists)) {
                     const topArtistNames = user.topArtists.slice(0, 10).map(a => a.name).join(', ');
-                    userContext = `The user loves: ${topArtistNames}. Include similar artists or influences.`;
+                    userContext = `The user's all-time favorites: ${topArtistNames}. `;
+                }
+
+                // Inject Recent Swipes to heavily influence the AI
+                const recentSwipes = await prisma.swipeHistory.findMany({
+                    where: { userId: decoded.userId, action: { in: ['LIKE', 'SUPERLIKE'] } },
+                    orderBy: { created_at: 'desc' },
+                    take: 15
+                });
+
+                if (recentSwipes.length > 0) {
+                    const swipeText = recentSwipes.map(s => `${s.songName} by ${s.artistName}`).join(', ');
+                    userContext += `The user has recently swiped and liked these specific tracks: ${swipeText}. Heavily prioritize this vibe when picking songs.`;
                 }
             } catch (authErr) {
                 // Personalization skipped
