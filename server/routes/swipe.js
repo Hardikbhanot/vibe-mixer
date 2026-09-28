@@ -42,13 +42,14 @@ router.get('/feed', authenticateToken, initSpotifyApi, async (req, res) => {
                 // Pick a random recently liked song to find similar semantic vibes
                 const seedSong = swipedSongs[Math.floor(Math.random() * swipedSongs.length)];
                 
-                // Find its embedding in TrackKnowledge
-                const knownTrack = await prisma.trackKnowledge.findFirst({
-                    where: { 
-                        title: { equals: seedSong.songName, mode: 'insensitive' }
-                    },
-                    select: { lyricsEmbedding: true }
-                });
+                // Find its embedding in TrackKnowledge using queryRaw (pgvector support)
+                const knownTracks = await prisma.$queryRawUnsafe(
+                    `SELECT "lyricsEmbedding" FROM "TrackKnowledge" 
+                     WHERE LOWER(title) = LOWER($1) LIMIT 1`,
+                    seedSong.songName
+                );
+                
+                const knownTrack = knownTracks[0];
 
                 if (knownTrack && knownTrack.lyricsEmbedding) {
                     // Vector Search for 10 semantically similar tracks!
