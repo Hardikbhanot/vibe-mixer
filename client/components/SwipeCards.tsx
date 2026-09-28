@@ -13,6 +13,7 @@ interface Track {
     };
     uri: string;
     external_urls?: { spotify: string };
+    is_youtube?: boolean;
 }
 
 interface SwipeCardsProps {
@@ -26,6 +27,7 @@ const SwipeCards = ({ tracks, onEmpty }: SwipeCardsProps) => {
     const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
 
     const getSpotifyUrl = (track: Track) => {
+        if (track.is_youtube) return null;
         if (track.external_urls?.spotify) return track.external_urls.spotify;
         if (track.id) return `https://open.spotify.com/track/${track.id}`;
         return null;
