@@ -7,36 +7,32 @@ const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY
 });
 
-const DEFAULT_MODEL = "qwen/qwen3.8-27b";
-const FALLBACK_MODEL = "qwen/qwen3.8-27b"; // Fallback is always the reliable one
+const DEFAULT_MODEL = "openai/gpt-oss-120b"; // 120B Flagship music reasoning
+const SECONDARY_MODEL = "qwen/qwen3.8-27b";  // 27B Fast & Multilingual
+const EMERGENCY_MODEL = "openai/gpt-oss-20b"; // 20B High-throughput fallback
 
-// Helper for Model Fallback Logic
+// Helper for 3-Tier Model Fallback Logic
 const callGroqWithFallback = async (messages, preferredModel = DEFAULT_MODEL, temperature = 0.7, jsonMode = true) => {
-    try {
-        console.log(`[Groq] Attempting with Model: ${preferredModel}`);
-        return await groq.chat.completions.create({
-            messages,
-            model: preferredModel,
-            response_format: jsonMode ? { type: "json_object" } : undefined,
-            temperature,
-        });
-    } catch (error) {
-        // Check for Rate Limit (429) or Model Not Found (404) or Bad Request (400 - sometimes happens with beta models)
-        if (error.status === 429 || error.code === 'rate_limit_exceeded' || error.status === 404 || error.status === 400) {
-            console.warn(`[Groq] Model ${preferredModel} failed (${error.status || error.code}). Falling back to ${FALLBACK_MODEL}...`);
+    const modelsToTry = [preferredModel];
+    if (!modelsToTry.includes(SECONDARY_MODEL)) modelsToTry.push(SECONDARY_MODEL);
+    if (!modelsToTry.includes(EMERGENCY_MODEL)) modelsToTry.push(EMERGENCY_MODEL);
 
-            // If we were already using fallback, just throw to avoid infinite loop
-            if (preferredModel === FALLBACK_MODEL) throw error;
-
+    let lastError = null;
+    for (const model of modelsToTry) {
+        try {
+            console.log(`[Groq] Attempting with Model: ${model}`);
             return await groq.chat.completions.create({
                 messages,
-                model: FALLBACK_MODEL,
+                model,
                 response_format: jsonMode ? { type: "json_object" } : undefined,
                 temperature,
             });
+        } catch (error) {
+            lastError = error;
+            console.warn(`[Groq] Model ${model} failed (${error.status || error.code || error.message}). Trying next fallback...`);
         }
-        throw error; // Re-throw other errors
     }
+    throw lastError;
 };
 
 // Enhanced function signature

@@ -35,3 +35,9 @@ For full system history and implementation details, see [SYSTEM_ARCHITECTURE_CHA
 - Automated weekly background enrichment runs via `server/services/cronScheduler.js` (Sundays at 03:00 UTC).
 - Enriches tracks with Groq audio features and iTunes album art / 30s preview streams without degrading user request latency.
 
+## 6. Two-Tier Platform Handling (Spotify 1st Preference, YouTube 2nd Preference)
+- In every track playback and playlist export workflow across Client and Server, enforce two strict tiers:
+  - **Tier 1 (Primary - Spotify)**: Always attempt Spotify first. For playback, open direct Spotify URI or `https://open.spotify.com/search/...`. For saving, export directly to the user's Spotify account. If the user has not logged in with Spotify, cleanly prompt them with a 1-click connection to `/auth/login`.
+  - **Tier 2 (Fallback - YouTube)**: If Spotify is unauthenticated, unavailable, or the user prefers YouTube, fallback seamlessly to YouTube Music search or YouTube playlist export.
+
+

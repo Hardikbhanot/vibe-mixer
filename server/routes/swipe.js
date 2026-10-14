@@ -98,46 +98,57 @@ router.get('/feed', authenticateToken, initSpotifyApi, async (req, res) => {
                             `[${centroid.join(',')}]`
                         );
 
-                        // Filter unseen tracks and format into client-ready objects
+                        const unseenCandidates = [];
                         for (const track of candidates) {
                             const trackKey = `${track.title.toLowerCase()}:${track.artist.toLowerCase()}`;
                             if (!seenSet.has(track.id) && !seenSet.has(trackKey)) {
                                 seenSet.add(track.id);
                                 seenSet.add(trackKey);
-
-                                let cover = track.coverImage;
-                                let preview = track.previewUrl;
-
-                                // Fast asynchronous fallback for artwork if null
-                                if (!cover) {
-                                    fetchTrackMetadata(track.title, track.artist).then(meta => {
-                                        if (meta?.coverImage) {
-                                            prisma.trackKnowledge.update({
-                                                where: { id: track.id },
-                                                data: { coverImage: meta.coverImage, previewUrl: meta.previewUrl }
-                                            }).catch(() => {});
-                                        }
-                                    }).catch(() => {});
-                                }
-
-                                centroidTracks.push({
-                                    id: track.spotifyId || track.id,
-                                    name: track.title,
-                                    artists: [{ name: track.artist }],
-                                    album: {
-                                        name: track.title,
-                                        images: [{ url: cover || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600' }]
-                                    },
-                                    uri: track.spotifyUri || `spotify:search:${encodeURIComponent(track.title + ' ' + track.artist)}`,
-                                    preview_url: preview,
-                                    external_urls: { spotify: `https://open.spotify.com/search/${encodeURIComponent(track.title + ' ' + track.artist)}` },
-                                    duration_ms: track.durationMs || 210000,
-                                    taste_match: true
-                                });
-
-                                if (centroidTracks.length >= 20) break;
+                                unseenCandidates.push(track);
+                                if (unseenCandidates.length >= 20) break;
                             }
                         }
+
+                        // Parallel resolution of album artwork (Spotify / iTunes)
+                        const resolvedTracks = await Promise.all(unseenCandidates.map(async (track) => {
+                            let cover = track.coverImage;
+                            let preview = track.previewUrl;
+
+                            if (!cover) {
+                                try {
+                                    const meta = await fetchTrackMetadata(track.title, track.artist);
+                                    if (meta?.coverImage) {
+                                        cover = meta.coverImage;
+                                        preview = meta.previewUrl || preview;
+                                        prisma.trackKnowledge.update({
+                                            where: { id: track.id },
+                                            data: { coverImage: meta.coverImage, previewUrl: meta.previewUrl }
+                                        }).catch(() => {});
+                                    }
+                                } catch (e) {}
+                            }
+
+                            const spotifyUrl = track.spotifyUri?.startsWith('spotify:track:')
+                                ? `https://open.spotify.com/track/${track.spotifyUri.replace('spotify:track:', '')}`
+                                : `https://open.spotify.com/search/${encodeURIComponent(track.title + ' ' + track.artist)}`;
+
+                            return {
+                                id: track.spotifyId || track.id,
+                                name: track.title,
+                                artists: [{ name: track.artist }],
+                                album: {
+                                    name: track.title,
+                                    images: [{ url: cover || `https://image.pollinations.ai/prompt/${encodeURIComponent(track.title + ' ' + track.artist + ' music cover')}?width=600&height=600&nologo=true` }]
+                                },
+                                uri: track.spotifyUri || `spotify:search:${encodeURIComponent(track.title + ' ' + track.artist)}`,
+                                preview_url: preview,
+                                external_urls: { spotify: spotifyUrl },
+                                duration_ms: track.durationMs || 210000,
+                                taste_match: true
+                            };
+                        }));
+
+                        centroidTracks.push(...resolvedTracks);
                     }
                 }
             } catch (centroidErr) {

@@ -113,17 +113,25 @@ export default function PublicMixPage() {
     };
 
     const handlePlayTrack = (track: Track) => {
-        // Simple open in Spotify for now
-        const url = track.external_urls?.spotify || `https://open.spotify.com/track/${track.id}`;
+        let url = track.external_urls?.spotify;
+        if (!url && track.uri?.startsWith('spotify:track:')) {
+            url = `https://open.spotify.com/track/${track.uri.replace('spotify:track:', '')}`;
+        }
+        if (!url && track.id && !track.id.startsWith('itunes_') && !track.id.startsWith('yt_')) {
+            url = `https://open.spotify.com/track/${track.id}`;
+        }
+        if (!url) {
+            const artist = track.artist || track.artists?.map(a => a.name).join(' ') || '';
+            url = `https://open.spotify.com/search/${encodeURIComponent(track.name + ' ' + artist)}`;
+        }
         window.open(url, '_blank');
     };
 
     const handleSaveToSpotify = async () => {
         if (!playlist) return;
         setIsSaving(true);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
-
             const response = await fetch(`${apiUrl}/spotify/playlist`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -136,8 +144,8 @@ export default function PublicMixPage() {
             });
 
             if (response.status === 401) {
-                toast.error("Please login/connect Spotify first");
-                window.location.href = '/auth/login'; // Redirect to login if unauthorized
+                toast.error("Spotify not connected. Redirecting to Spotify login...");
+                window.location.href = `${apiUrl}/auth/login`;
                 return;
             }
 

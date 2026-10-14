@@ -27,17 +27,23 @@ const SwipeCards = ({ tracks, onEmpty }: SwipeCardsProps) => {
     const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
 
     const getSpotifyUrl = (track: Track) => {
-        if (track.is_youtube) return null;
-        if (track.external_urls?.spotify) return track.external_urls.spotify;
-        if (track.id) return `https://open.spotify.com/track/${track.id}`;
-        return null;
+        if (track.external_urls?.spotify && !track.is_youtube) return track.external_urls.spotify;
+        if (track.uri?.startsWith('spotify:track:')) {
+            return `https://open.spotify.com/track/${track.uri.replace('spotify:track:', '')}`;
+        }
+        if (track.id && !track.id.startsWith('itunes_') && !track.id.startsWith('yt_')) {
+            return `https://open.spotify.com/track/${track.id}`;
+        }
+        const artist = track.artists?.[0]?.name || '';
+        return `https://open.spotify.com/search/${encodeURIComponent(track.name + ' ' + artist)}`;
     };
 
     const getYoutubeUrl = (track: Track) => {
         if (track.is_youtube && track.external_urls?.spotify) {
             return track.external_urls.spotify;
         }
-        return `https://www.youtube.com/results?search_query=${encodeURIComponent(track.name + ' ' + track.artists[0].name)}`;
+        const artist = track.artists?.[0]?.name || '';
+        return `https://www.youtube.com/results?search_query=${encodeURIComponent(track.name + ' ' + artist)}`;
     };
 
     const handlePlay = (track: Track) => {

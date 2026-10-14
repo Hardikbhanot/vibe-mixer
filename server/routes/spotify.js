@@ -24,6 +24,15 @@ router.post('/playlist', initSpotifyApi, async (req, res) => {
         return res.status(400).json({ error: 'Track URIs are required' });
     }
 
+    // Guest mode cannot create playlists on user accounts
+    if (req.isGuest) {
+        return res.status(401).json({
+            error: 'Spotify account not connected. Please login with Spotify to save playlists.',
+            needsLogin: true,
+            loginUrl: '/auth/login'
+        });
+    }
+
     // Define the operation to allow retry
     const performPlaylistCreation = async () => {
         // 1. Create Playlist

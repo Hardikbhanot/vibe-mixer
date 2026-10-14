@@ -205,12 +205,29 @@ function ResultsContent() {
             toast.error("Network error when saving.");
         }
     };
+    const getTrackSpotifyUrl = (t: Track) => {
+        if (t.external_urls?.spotify) return t.external_urls.spotify;
+        if (t.uri?.startsWith('spotify:track:')) {
+            return `https://open.spotify.com/track/${t.uri.replace('spotify:track:', '')}`;
+        }
+        if (t.id && !t.id.startsWith('itunes_') && !t.id.startsWith('yt_')) {
+            return `https://open.spotify.com/track/${t.id}`;
+        }
+        const artist = t.artist || t.artists?.[0]?.name || '';
+        return `https://open.spotify.com/search/${encodeURIComponent(t.name + ' ' + artist)}`;
+    };
+
+    const getTrackYoutubeUrl = (t: Track) => {
+        const artist = t.artist || t.artists?.[0]?.name || '';
+        return `https://www.youtube.com/results?search_query=${encodeURIComponent(t.name + ' ' + artist)}`;
+    };
+
     const handleSaveToSpotify = async () => {
         if (!data) return;
         setIsSaving(true);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
         try {
-            const finalCoverImage = coverImage || 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=512&h=512&fit=crop'; // Fallback if backend fails
-            const apiUrl = '';
+            const finalCoverImage = coverImage || 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=512&h=512&fit=crop';
 
             const response = await fetch(`${apiUrl}/spotify/playlist`, {
                 method: 'POST',
@@ -223,6 +240,12 @@ function ResultsContent() {
                 credentials: 'include'
             });
 
+            if (response.status === 401) {
+                toast.error("Spotify not connected. Redirecting to Spotify login...");
+                window.location.href = `${apiUrl}/auth/login`;
+                return;
+            }
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.error || 'Failed to create playlist');
@@ -230,7 +253,9 @@ function ResultsContent() {
 
             const result = await response.json();
             toast.success('Spotify Playlist created successfully!');
-            window.open(result.external_urls.spotify, '_blank');
+            if (result.external_urls?.spotify) {
+                window.open(result.external_urls.spotify, '_blank');
+            }
         } catch (error: any) {
             console.error('Error saving playlist:', error);
             toast.error(error.message || 'Failed to save playlist. Check Spotify login.');
@@ -242,8 +267,8 @@ function ResultsContent() {
     const handleSaveToYoutube = async () => {
         if (!data) return;
         setIsSavingYoutube(true);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
         try {
-            const apiUrl = '';
             const response = await fetch(`${apiUrl}/youtube/playlist`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -251,7 +276,7 @@ function ResultsContent() {
                     name: data.playlist_name,
                     description: data.playlist_description,
                     tracks: data.tracks,
-                    coverImage: coverImage // Send the generated custom image
+                    coverImage: coverImage
                 }),
                 credentials: 'include'
             });
@@ -264,7 +289,9 @@ function ResultsContent() {
 
             const result = await response.json();
             toast.success('YouTube Playlist created successfully!');
-            window.open(result.playlistUrl, '_blank');
+            if (result.playlistUrl) {
+                window.open(result.playlistUrl, '_blank');
+            }
         } catch (error) {
             console.error('Error saving to YouTube:', error);
             toast.error('Failed to save playlist.');
@@ -272,9 +299,6 @@ function ResultsContent() {
             setIsSavingYoutube(false);
         }
     };
-
-
-
 
     if (loading) return <div className="flex h-screen items-center justify-center">Loading your vibe...</div>;
 
@@ -294,9 +318,9 @@ function ResultsContent() {
     const handlePlayTrack = (track: Track) => {
         const platform = localStorage.getItem('musicPlatform');
         if (platform === 'spotify') {
-            window.open(track.external_urls.spotify, '_blank');
+            window.open(getTrackSpotifyUrl(track), '_blank');
         } else if (platform === 'youtube') {
-            window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(track.name + ' ' + (track.artist || track.artists?.[0]?.name || ''))}`, '_blank');
+            window.open(getTrackYoutubeUrl(track), '_blank');
         } else {
             setSelectedTrackForPlay(track);
             setShowPlatformModal(true);
@@ -310,9 +334,9 @@ function ResultsContent() {
 
         if (selectedTrackForPlay) {
             if (platform === 'spotify') {
-                window.open(selectedTrackForPlay.external_urls.spotify, '_blank');
+                window.open(getTrackSpotifyUrl(selectedTrackForPlay), '_blank');
             } else {
-                window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedTrackForPlay.name + ' ' + (selectedTrackForPlay.artist || selectedTrackForPlay.artists?.[0]?.name || ''))}`, '_blank');
+                window.open(getTrackYoutubeUrl(selectedTrackForPlay), '_blank');
             }
         }
         setShowPlatformModal(false);
