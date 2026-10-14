@@ -88,7 +88,7 @@ function ResultsContent() {
     const generateCoverImage = async (prompt: string) => {
         setIsGeneratingImage(true);
         try {
-            const apiUrl = '';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
             const response = await fetch(`${apiUrl}/ai/image`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

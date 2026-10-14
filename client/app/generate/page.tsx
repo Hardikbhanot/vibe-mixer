@@ -16,7 +16,7 @@ export default function GeneratePage() {
     const [valence, setValence] = useState(30);
     const [duration, setDuration] = useState(60); // Default 60 minutes
     const [vibeType, setVibeType] = useState<'offbeat' | 'popular' | 'mix'>('mix');
-    const [model, setModel] = useState('llama-3.3-70b-versatile');
+    const [model, setModel] = useState('qwen/qwen3.8-27b');
     const [isLoading, setIsLoading] = useState(false);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
@@ -235,12 +235,12 @@ export default function GeneratePage() {
                         onChange={(e) => setModel(e.target.value)}
                         value={model}
                         className="w-full bg-surface-dark text-white rounded-lg p-3 border border-white/10 focus:border-primary focus:outline-none"
-                    >
-                        <option value="llama-3.3-70b-versatile">Llama 3.3 (Standard - Reliable)</option>
-                        <option value="openai/gpt-oss-120b">GPT-OSS 120B (Experimental - Smartest)</option>
+                        <option value="qwen/qwen3.8-27b">Qwen 3.8 27B (High Accuracy - Fast)</option>
+                        <option value="openai/gpt-oss-120b">GPT-OSS 120B (Deep Music Knowledge)</option>
+                        <option value="openai/gpt-oss-20b">GPT-OSS 20B (Ultra Fast)</option>
                     </select>
                     <p className="text-xs text-white/40 px-1">
-                        GPT-OSS is smarter but may hit rate limits. We auto-fallback if it fails.
+                        Select your preferred neural DJ engine. Automatic fallback is enabled.
                     </p>
                 </div>
 
