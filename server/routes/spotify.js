@@ -33,8 +33,33 @@ router.post('/playlist', initSpotifyApi, async (req, res) => {
         });
         const playlistId = createData.body.id;
 
-        // 2. Add Tracks
-        await req.spotifyApi.addTracksToPlaylist(playlistId, trackUris);
+        // 2. Resolve & Sanitize Track URIs
+        const resolvedUris = [];
+        for (const uri of trackUris) {
+            if (!uri || typeof uri !== 'string') continue;
+
+            if (uri.startsWith('spotify:track:')) {
+                resolvedUris.push(uri);
+            } else if (uri.startsWith('spotify:search:')) {
+                const query = decodeURIComponent(uri.replace('spotify:search:', ''));
+                try {
+                    const searchRes = await req.spotifyApi.searchTracks(query, { limit: 1 });
+                    const foundTrack = searchRes.body.tracks?.items?.[0];
+                    if (foundTrack && foundTrack.uri) {
+                        resolvedUris.push(foundTrack.uri);
+                    }
+                } catch (sErr) {
+                    console.warn(`[Spotify Route] Failed to resolve search URI "${query}":`, sErr.message);
+                }
+            } else if (/^[0-9A-Za-z]{22}$/.test(uri)) {
+                resolvedUris.push(`spotify:track:${uri}`);
+            }
+        }
+
+        // 3. Add Tracks
+        if (resolvedUris.length > 0) {
+            await req.spotifyApi.addTracksToPlaylist(playlistId, resolvedUris);
+        }
 
         // 3. Upload Cover Image (if provided)
         if (coverImageUrl) {
