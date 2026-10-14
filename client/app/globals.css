@@ -23,6 +23,19 @@
     'opsz' 24;
 }
 
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 10s linear infinite;
+}
+
 @layer base {
   body {
     @apply bg-background-light dark:bg-background-dark text-gray-900 dark:text-white font-display;

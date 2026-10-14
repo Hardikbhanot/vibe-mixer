@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '@/context/AuthContext';
 import { usePathname, useRouter } from 'next/navigation';
+import { Sparkles, ArrowLeft, Menu, X, Disc3 } from 'lucide-react';
 
 export const Header = () => {
     const { user, loading } = useAuth();
@@ -17,148 +18,165 @@ export const Header = () => {
     const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
     const closeMenu = () => setIsMenuOpen(false);
 
+    const navLinks = [
+        { href: '/generate', label: 'Studio', badge: 'AI' },
+        { href: '/swipe', label: 'Taste Deck' },
+        { href: '/discover', label: 'Community' },
+        { href: '/match', label: 'Vibe Match' },
+        { href: '/india', label: 'Radar' },
+    ];
+
     return (
         <>
-            <header className="flex items-center px-6 py-3 justify-between sticky top-0 z-50 bg-background-light/70 dark:bg-background-dark/70 backdrop-blur-xl border-b border-black/5 dark:border-white/5 transition-all duration-300">
+            <header className="flex items-center px-4 sm:px-8 py-3.5 justify-between sticky top-0 z-50 bg-[#070709]/80 dark:bg-[#070709]/80 backdrop-blur-xl border-b border-white/[0.08] transition-all duration-300">
                 {/* Left: Back or Logo */}
                 <div className="flex items-center gap-4">
                     {pathname !== '/' && (
                         <button
                             onClick={() => router.back()}
-                            className="hidden md:flex text-foreground size-10 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                            className="flex text-white/70 size-9 shrink-0 items-center justify-center rounded-xl hover:bg-white/[0.08] hover:text-white transition-colors border border-white/[0.06]"
+                            title="Go Back"
                         >
-                            <span className="material-symbols-outlined text-2xl">arrow_back</span>
+                            <ArrowLeft size={18} />
                         </button>
                     )}
 
                     {/* Branding */}
-                    <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                        <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain" />
-                        <h1 className="text-foreground text-2xl font-bold tracking-tight hidden md:block bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                            VibeMixer
-                        </h1>
+                    <Link href="/" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity group">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-primary to-cyan-400 p-[1.5px] shadow-lg shadow-purple-500/20 group-hover:scale-105 transition-transform">
+                            <div className="w-full h-full rounded-[10px] bg-[#070709] flex items-center justify-center">
+                                <Disc3 size={18} className="text-purple-300 group-hover:rotate-90 transition-transform duration-500" />
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-white text-xl font-bold tracking-tight">
+                                VibeMixer
+                            </span>
+                            <span className="hidden sm:inline text-[9px] uppercase font-mono font-bold tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                2.5
+                            </span>
+                        </div>
                     </Link>
                 </div>
 
                 {/* Center: Navigation (Desktop) */}
-                <nav className="hidden md:flex items-center gap-1 bg-surface-light/50 dark:bg-surface-dark/50 p-1 rounded-full border border-black/5 dark:border-white/5 backdrop-blur-sm">
-                    <Link
-                        href="/generate"
-                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${pathname === '/generate' ? 'bg-primary text-background-dark shadow-sm' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
-                    >
-                        ✨ Generate
-                    </Link>
-                    <Link
-                        href="/swipe"
-                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${pathname === '/swipe' ? 'bg-primary text-background-dark shadow-sm' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
-                    >
-                        Swipe
-                    </Link>
-                    <Link
-                        href="/discover"
-                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${pathname === '/discover' ? 'bg-primary text-background-dark shadow-sm' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
-                    >
-                        Discover
-                    </Link>
-                    <Link
-                        href="/match"
-                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${pathname === '/match' ? 'bg-primary text-background-dark shadow-sm' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
-                    >
-                        Match
-                    </Link>
-                    <Link
-                        href="/india"
-                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${pathname === '/india' ? 'bg-primary text-background-dark shadow-sm' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
-                    >
-                        Map
-                    </Link>
+                <nav className="hidden lg:flex items-center gap-1 bg-white/[0.03] p-1.5 rounded-full border border-white/[0.08] backdrop-blur-md shadow-inner">
+                    {navLinks.map((link) => {
+                        const isActive = pathname === link.href;
+                        return (
+                            <Link
+                                key={link.href}
+                                href={link.href}
+                                className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all flex items-center gap-1.5 ${
+                                    isActive
+                                        ? 'bg-white/15 text-white shadow-sm border border-white/20'
+                                        : 'text-white/60 hover:text-white hover:bg-white/[0.05]'
+                                }`}
+                            >
+                                {link.label}
+                                {link.badge && (
+                                    <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-purple-500/30 text-purple-200">
+                                        {link.badge}
+                                    </span>
+                                )}
+                            </Link>
+                        );
+                    })}
                 </nav>
 
                 {/* Right: Actions */}
                 <div className="flex items-center gap-3 justify-end">
-                    <div className="hidden md:block">
+                    <div className="hidden sm:block">
                         <ThemeToggle />
                     </div>
 
                     {!loading && !isAuthPage && (
                         user ? (
-                            <Link href="/profile" className="relative group hidden md:block">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-secondary p-[2px] transition-transform group-hover:scale-105">
-                                    <div className="w-full h-full rounded-full bg-background-light dark:bg-background-dark flex items-center justify-center overflow-hidden">
+                            <Link href="/profile" className="relative group">
+                                <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-cyan-400 p-[1.5px] transition-transform group-hover:scale-105 shadow-md">
+                                    <div className="w-full h-full rounded-full bg-[#070709] flex items-center justify-center overflow-hidden">
                                         {user.avatarUrl ? (
-                                            <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
+                                            <img src={user.avatarUrl} alt={user.username || 'User'} className="w-full h-full object-cover" />
                                         ) : (
-                                            <span className="font-bold text-lg text-foreground uppercase">{user.email[0]}</span>
+                                            <span className="font-bold text-xs text-white uppercase">{user.email?.[0] || 'U'}</span>
                                         )}
                                     </div>
                                 </div>
                             </Link>
                         ) : (
-                            <Link href="/auth" className="hidden md:block">
-                                <button className="px-5 py-2 rounded-full bg-primary text-background-dark font-bold text-sm transition-transform hover:scale-105 shadow-lg shadow-primary/25">
-                                    Login
-                                </button>
-                            </Link>
+                            <div className="flex items-center gap-2">
+                                <Link href="/auth" className="hidden sm:block">
+                                    <button className="px-4 py-2 text-xs font-semibold text-white/70 hover:text-white transition-colors">
+                                        Sign In
+                                    </button>
+                                </Link>
+                                <Link href="/generate">
+                                    <button className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-primary text-white font-bold text-xs hover:opacity-90 transition-all shadow-md shadow-purple-500/20 flex items-center gap-1.5">
+                                        <Sparkles size={13} />
+                                        <span>Studio</span>
+                                    </button>
+                                </Link>
+                            </div>
                         )
                     )}
 
                     {/* Mobile Hamburger Button */}
                     <button
                         onClick={toggleMenu}
-                        className="md:hidden flex size-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50"
+                        className="lg:hidden flex size-9 items-center justify-center rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/80 hover:text-white transition-colors"
+                        aria-label="Toggle Menu"
                     >
-                        <span className="material-symbols-outlined text-2xl">
-                            {isMenuOpen ? 'close' : 'menu'}
-                        </span>
+                        {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
                     </button>
                 </div>
             </header>
 
             {/* Mobile Menu Overlay */}
             {isMenuOpen && (
-                <div className="fixed inset-0 z-40 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-xl flex flex-col items-center justify-center gap-8 md:hidden animate-in fade-in zoom-in-95 duration-200 p-6">
-                    <ThemeToggle />
+                <div className="fixed inset-0 z-40 bg-[#070709]/95 backdrop-blur-2xl flex flex-col items-center justify-center gap-8 lg:hidden animate-in fade-in zoom-in-95 duration-200 p-6">
+                    <div className="flex justify-between items-center w-full max-w-xs mb-4">
+                        <span className="text-xs uppercase font-mono tracking-wider text-white/40">Navigation</span>
+                        <ThemeToggle />
+                    </div>
 
-                    <nav className="flex flex-col items-center gap-6 w-full max-w-xs">
-                        <Link href="/generate" onClick={closeMenu} className="w-full py-4 text-center rounded-2xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xl font-bold">
-                            ✨ Generate Mix
-                        </Link>
-                        <div className="w-full h-px bg-border/50"></div>
-                        <Link href="/swipe" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
-                            Swipe Mode
-                        </Link>
-                        <Link href="/discover" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
-                            Discover
-                        </Link>
-                        <Link href="/match" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
-                            Vibe Match
-                        </Link>
-                        <Link href="/india" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
-                            Global Map
-                        </Link>
-                        <Link href="/messages" onClick={closeMenu} className="text-2xl font-bold hover:text-primary transition-colors">
-                            Messages
-                        </Link>
+                    <nav className="flex flex-col items-center gap-3 w-full max-w-xs">
+                        {navLinks.map((link) => (
+                            <Link
+                                key={link.href}
+                                href={link.href}
+                                onClick={closeMenu}
+                                className={`w-full py-3.5 px-4 text-center rounded-2xl font-bold text-base transition-all ${
+                                    pathname === link.href
+                                        ? 'bg-purple-600/20 border border-purple-500/40 text-purple-300'
+                                        : 'bg-white/[0.03] border border-white/[0.06] text-white/80 hover:text-white'
+                                }`}
+                            >
+                                {link.label}
+                            </Link>
+                        ))}
                     </nav>
 
                     {!loading && !isAuthPage && (
                         user ? (
-                            <Link href="/profile" onClick={closeMenu} className="flex flex-col items-center gap-2 mt-4">
-                                <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-primary to-secondary p-[2px]">
-                                    <div className="w-full h-full rounded-full bg-background-light dark:bg-background-dark flex items-center justify-center overflow-hidden">
+                            <Link href="/profile" onClick={closeMenu} className="flex items-center gap-3 mt-4 px-4 py-2.5 rounded-2xl bg-white/[0.05] border border-white/10">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-cyan-400 p-[1.5px]">
+                                    <div className="w-full h-full rounded-full bg-black flex items-center justify-center overflow-hidden">
                                         {user.avatarUrl ? (
-                                            <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
+                                            <img src={user.avatarUrl} alt={user.username || 'User'} className="w-full h-full object-cover" />
                                         ) : (
-                                            <span className="font-bold text-2xl text-foreground uppercase">{user.email[0]}</span>
+                                            <span className="font-bold text-sm text-white uppercase">{user.email?.[0] || 'U'}</span>
                                         )}
                                     </div>
                                 </div>
-                                <span className="text-xl font-bold">My Profile</span>
+                                <div className="text-left">
+                                    <div className="text-xs font-bold text-white">{user.email}</div>
+                                    <div className="text-[10px] text-white/40">View Profile →</div>
+                                </div>
                             </Link>
                         ) : (
-                            <Link href="/auth" onClick={closeMenu}>
-                                <button className="px-8 py-3 rounded-full bg-primary text-background-dark font-bold text-lg transition-transform active:scale-95 shadow-lg shadow-primary/25">
-                                    Login to Vibe
+                            <Link href="/auth" onClick={closeMenu} className="w-full max-w-xs">
+                                <button className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-primary text-white font-bold text-sm transition-all shadow-lg shadow-purple-500/30">
+                                    Sign In / Register
                                 </button>
                             </Link>
                         )
