@@ -70,4 +70,9 @@ app.listen(PORT, () => {
   import('./services/backgroundSeeder.js').then(({ startBackgroundSeeding }) => {
     startBackgroundSeeding();
   }).catch(err => console.error('Failed to start seeder:', err));
+
+  // Start Automated Weekly Maintenance & Enrichment Cron Job
+  import('./services/cronScheduler.js').then(({ startCronScheduler }) => {
+    startCronScheduler();
+  }).catch(err => console.error('Failed to start cron scheduler:', err));
 });

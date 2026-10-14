@@ -30,3 +30,8 @@ For full system history and implementation details, see [SYSTEM_ARCHITECTURE_CHA
 - Never depend on Spotify's `/v1/audio-features` or `/v1/recommendations` endpoints (deprecated with 403s on standard developer apps).
 - All acoustic intelligence and recommendations are computed in-house via PostgreSQL + Groq + Gemini.
 - Use Spotify Web API strictly for OAuth login and playlist export (`POST /v1/users/{id}/playlists` and `POST /v1/playlists/{id}/tracks`).
+
+## 5. Background Maintenance & Enrichment
+- Automated weekly background enrichment runs via `server/services/cronScheduler.js` (Sundays at 03:00 UTC).
+- Enriches tracks with Groq audio features and iTunes album art / 30s preview streams without degrading user request latency.
+

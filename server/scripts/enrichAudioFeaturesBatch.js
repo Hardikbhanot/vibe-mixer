@@ -158,30 +158,39 @@ Output valid JSON with the format:
 /**
  * Process a single batch of tracks
  */
-async function processBatch() {
+/**
+ * Process a single batch of tracks
+ */
+async function processBatch(batchSize = BATCH_SIZE) {
     const tracks = await prisma.trackKnowledge.findMany({
-        where: { valence: null },
-        take: BATCH_SIZE
+        where: {
+            OR: [
+                { valence: null },
+                { coverImage: null }
+            ]
+        },
+        take: batchSize
     });
 
     if (tracks.length === 0) {
-        console.log('✨ All tracks are enriched! No remaining null valence tracks.');
+        console.log('✨ All tracks are enriched! No remaining un-enriched tracks.');
         return false;
     }
 
     console.log(`\n⚡ Processing batch of ${tracks.length} tracks...`);
 
-    // 1. LLM Feature Estimation for whole batch
-    const featuresList = await estimateBatchFeatures(tracks);
-    if (!featuresList || featuresList.length === 0) {
-        console.warn('⚠️ No features returned for batch, will retry next iteration.');
-        return true;
-    }
+    // 1. LLM Feature Estimation for tracks missing valence
+    const tracksNeedingFeatures = tracks.filter(t => t.valence === null);
+    let featureMap = new Map();
 
-    const featureMap = new Map();
-    for (const f of featuresList) {
-        if (f.id && typeof f.valence === 'number') {
-            featureMap.set(f.id, f);
+    if (tracksNeedingFeatures.length > 0) {
+        const featuresList = await estimateBatchFeatures(tracksNeedingFeatures);
+        if (featuresList && featuresList.length > 0) {
+            for (const f of featuresList) {
+                if (f.id && typeof f.valence === 'number') {
+                    featureMap.set(f.id, f);
+                }
+            }
         }
     }
 
@@ -189,14 +198,10 @@ async function processBatch() {
     let updatedCount = 0;
     for (const t of tracks) {
         let feat = featureMap.get(t.id);
-        if (!feat) {
-            feat = {
-                valence: 0.5,
-                energy: 0.5,
-                danceability: 0.5,
-                tempo: 120
-            };
-        }
+        const finalValence = feat ? Math.max(0, Math.min(1, feat.valence)) : (t.valence ?? 0.5);
+        const finalEnergy = feat ? Math.max(0, Math.min(1, feat.energy)) : (t.energy ?? 0.5);
+        const finalDanceability = feat ? Math.max(0, Math.min(1, feat.danceability || 0.5)) : (t.danceability ?? 0.5);
+        const finalTempo = feat ? Math.max(50, Math.min(220, feat.tempo || 120)) : (t.tempo ?? 120);
 
         // Fetch cover art & preview if not already present
         let meta = null;
@@ -209,12 +214,12 @@ async function processBatch() {
                 where: { id: t.id },
                 data: {
                     spotifyId: t.spotifyId || 'BATCH_ENRICHED',
-                    valence: Math.max(0, Math.min(1, feat.valence)),
-                    energy: Math.max(0, Math.min(1, feat.energy)),
-                    danceability: Math.max(0, Math.min(1, feat.danceability || 0.5)),
-                    tempo: Math.max(50, Math.min(220, feat.tempo || 120)),
-                    acousticness: 0.5,
-                    instrumentalness: 0.0,
+                    valence: finalValence,
+                    energy: finalEnergy,
+                    danceability: finalDanceability,
+                    tempo: finalTempo,
+                    acousticness: t.acousticness ?? 0.5,
+                    instrumentalness: t.instrumentalness ?? 0.0,
                     coverImage: t.coverImage || meta?.coverImage || null,
                     previewUrl: t.previewUrl || meta?.previewUrl || null,
                     durationMs: t.durationMs || meta?.durationMs || 210000
@@ -230,25 +235,37 @@ async function processBatch() {
     return true;
 }
 
-// Main execution loop
-(async () => {
-    console.log(`🚀 Starting High-Throughput Audio Feature & Artwork Enrichment (${BATCH_SIZE} tracks/batch)...`);
+/**
+ * Main batch enrichment runner. Can be invoked directly or from scheduled cron jobs.
+ */
+export async function runBatchEnrichment({ maxBatches = 50, batchSize = BATCH_SIZE, delayMs = DELAY_BETWEEN_BATCHES_MS, disconnectOnFinish = false } = {}) {
+    console.log(`🚀 Starting Audio Feature & Artwork Enrichment (${batchSize} tracks/batch, max ${maxBatches} batches)...`);
     
     // Count total remaining
     const totalRemaining = await prisma.trackKnowledge.count({
-        where: { valence: null }
+        where: {
+            OR: [
+                { valence: null },
+                { coverImage: null }
+            ]
+        }
     });
-    console.log(`📊 Total tracks to enrich: ${totalRemaining}`);
+    console.log(`📊 Total tracks needing audio features or artwork: ${totalRemaining}`);
+
+    if (totalRemaining === 0) {
+        console.log('✨ All tracks already fully enriched!');
+        if (disconnectOnFinish) await prisma.$disconnect();
+        return { totalRemaining: 0, batchesProcessed: 0 };
+    }
 
     let hasMore = true;
     let iteration = 0;
-    const maxIterations = process.env.MAX_BATCHES ? parseInt(process.env.MAX_BATCHES) : 100; // limit or continuous
 
-    while (hasMore && iteration < maxIterations) {
+    while (hasMore && iteration < maxBatches) {
         iteration++;
         try {
-            hasMore = await processBatch();
-            if (hasMore) await sleep(DELAY_BETWEEN_BATCHES_MS);
+            hasMore = await processBatch(batchSize);
+            if (hasMore) await sleep(delayMs);
         } catch (e) {
             console.error('Unhandled batch error:', e);
             await sleep(5000);
@@ -256,5 +273,19 @@ async function processBatch() {
     }
 
     console.log(`🎉 Enrichment run finished (${iteration} iterations).`);
-    await prisma.$disconnect();
-})();
+    if (disconnectOnFinish) {
+        await prisma.$disconnect();
+    }
+    return { totalRemaining, batchesProcessed: iteration };
+}
+
+// Auto-run if executed directly as a script (e.g. node scripts/enrichAudioFeaturesBatch.js)
+const isDirectExecution = process.argv[1] && (
+    fileURLToPath(import.meta.url) === process.argv[1] ||
+    process.argv[1].endsWith('enrichAudioFeaturesBatch.js')
+);
+
+if (isDirectExecution) {
+    const maxBatches = process.env.MAX_BATCHES ? parseInt(process.env.MAX_BATCHES) : 100;
+    runBatchEnrichment({ maxBatches, disconnectOnFinish: true });
+}

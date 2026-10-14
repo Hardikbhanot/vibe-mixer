@@ -159,6 +159,13 @@ model TrackKnowledge {
 - Filters out all previously swiped track IDs and titles.
 - Serves non-repeating recommendations directly from PostgreSQL in **<100ms**.
 
+### 5.5 Automated Weekly Maintenance Cron (`server/services/cronScheduler.js`)
+- Integrated `node-cron` directly into the backend server (`server/server.js`).
+- Default schedule: Every Sunday at 03:00 AM UTC (`0 3 * * 0`).
+- Automatically scans `TrackKnowledge` for records missing acoustic features (`valence IS NULL`) or artwork/preview streams (`coverImage IS NULL`).
+- Processes batches in the background via Groq LLM and iTunes Search API without blocking user traffic or depleting rate limits.
+- Supports override via environment variable `CRON_SCHEDULE` or disabling via `DISABLE_CRON=true`.
+
 ---
 
 ## 6. Spotify Web API Strategy & Decoupling
