@@ -3,96 +3,178 @@ import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth.js';
 import { initSpotifyApi } from '../middleware/spotifyAuth.js';
 import { searchYouTube, searchYouTubeMultiple } from '../services/youtube.js';
+import { fetchTrackMetadata } from '../services/trackMetadata.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Get Discovery Feed (Hindi + English Mix, Non-Repeating)
+/**
+ * Computes the weighted centroid vector of a user's taste
+ * Superlikes have 2x weight, likes have 1x weight
+ */
+function computeTasteCentroid(vectorsWithWeights) {
+    if (!vectorsWithWeights || vectorsWithWeights.length === 0) return null;
+    const dim = vectorsWithWeights[0].vector.length;
+    const centroid = new Array(dim).fill(0);
+    let totalWeight = 0;
+
+    for (const item of vectorsWithWeights) {
+        const weight = item.weight || 1.0;
+        totalWeight += weight;
+        for (let i = 0; i < dim; i++) {
+            centroid[i] += item.vector[i] * weight;
+        }
+    }
+
+    if (totalWeight === 0) return null;
+    for (let i = 0; i < dim; i++) {
+        centroid[i] = centroid[i] / totalWeight;
+    }
+    return centroid;
+}
+
+// Get Discovery Feed (Autonomous Taste Deck Powered by Dynamic Centroid)
 router.get('/feed', authenticateToken, initSpotifyApi, async (req, res) => {
     try {
         const userId = req.user.userId;
 
-        // 1. Get songs swiped in the last 48 hours (or all time, per user pref "never" also works)
-        // Let's do last 7 days for safety, or all time if possible to avoid repeats
-        // 1. Get songs swiped in the last 7 days (or all time)
-        const twoDaysAgo = new Date();
-        twoDaysAgo.setDate(twoDaysAgo.getDate() - 7);
-
+        // 1. Get recent swipes (past 14 days or last 60 swipes)
         const swipedSongs = await prisma.swipeHistory.findMany({
-            where: {
-                userId,
-                // created_at: { gte: twoDaysAgo } // Uncomment to enforce time limit if needed
-            },
-            select: { songName: true, artistName: true, spotifyId: true }
+            where: { userId },
+            orderBy: { created_at: 'desc' },
+            take: 60,
+            select: { songName: true, artistName: true, spotifyId: true, action: true }
         });
 
         const seenSet = new Set();
-        // Add ID-based dedupe
         swipedSongs.forEach(s => {
             if (s.spotifyId) seenSet.add(s.spotifyId);
             seenSet.add(`${s.songName.toLowerCase()}:${s.artistName.toLowerCase()}`);
         });
 
-        // 2. Build Search Queries (RAG-Powered if history exists, fallback to Generic)
-        let selectedQueries = [];
+        // 2. Autonomous Taste Centroid Vector Pipeline
+        let centroidTracks = [];
+        const positiveSwipes = swipedSongs.filter(s => s.action === 'LIKE' || s.action === 'SUPERLIKE');
 
-        try {
-            if (swipedSongs.length > 0) {
-                // RAG-POWERED DISCOVERY
-                // Pick a random recently liked song to find similar semantic vibes
-                const seedSong = swipedSongs[Math.floor(Math.random() * swipedSongs.length)];
-                
-                // Find its embedding in TrackKnowledge using queryRaw (pgvector support)
-                const knownTracks = await prisma.$queryRawUnsafe(
-                    `SELECT "lyricsEmbedding"::text FROM "TrackKnowledge" 
-                     WHERE LOWER(title) = LOWER($1) LIMIT 1`,
-                    seedSong.songName
+        if (positiveSwipes.length > 0) {
+            try {
+                // Fetch vector embeddings for the user's liked tracks
+                const likedTitles = positiveSwipes.map(s => s.songName.toLowerCase().replace(/'/g, "''"));
+                const knownRows = await prisma.$queryRawUnsafe(
+                    `SELECT title, "lyricsEmbedding"::text as vec FROM "TrackKnowledge" 
+                     WHERE LOWER(title) IN (${likedTitles.map(t => `'${t}'`).join(',')}) 
+                       AND "lyricsEmbedding" IS NOT NULL LIMIT 25`
                 );
-                
-                const knownTrack = knownTracks[0];
 
-                if (knownTrack && knownTrack.lyricsEmbedding) {
-                    // Vector Search for 10 semantically similar tracks!
-                    const similarTracks = await prisma.$queryRawUnsafe(
-                        `SELECT title, artist FROM "TrackKnowledge" 
-                         ORDER BY "lyricsEmbedding" <=> $1::vector LIMIT 10`,
-                        knownTrack.lyricsEmbedding
-                    );
-                    
-                    selectedQueries = similarTracks.map(t => `${t.title} ${t.artist}`);
+                if (knownRows.length > 0) {
+                    const rowMap = new Map();
+                    knownRows.forEach(r => {
+                        try {
+                            rowMap.set(r.title.toLowerCase(), JSON.parse(r.vec));
+                        } catch (e) {}
+                    });
+
+                    // Build weighted vectors
+                    const weightedVectors = [];
+                    positiveSwipes.forEach(s => {
+                        const vec = rowMap.get(s.songName.toLowerCase());
+                        if (vec) {
+                            weightedVectors.push({
+                                vector: vec,
+                                weight: s.action === 'SUPERLIKE' ? 2.0 : 1.0
+                            });
+                        }
+                    });
+
+                    const centroid = computeTasteCentroid(weightedVectors);
+
+                    if (centroid) {
+                        // Vector search directly from our 14,727 track knowledge base!
+                        const candidates = await prisma.$queryRawUnsafe(
+                            `SELECT id, title, artist, "coverImage", "spotifyUri", "previewUrl", "durationMs", valence, energy, tempo
+                             FROM "TrackKnowledge" 
+                             WHERE "lyricsEmbedding" IS NOT NULL
+                             ORDER BY "lyricsEmbedding" <=> $1::vector LIMIT 35`,
+                            `[${centroid.join(',')}]`
+                        );
+
+                        // Filter unseen tracks and format into client-ready objects
+                        for (const track of candidates) {
+                            const trackKey = `${track.title.toLowerCase()}:${track.artist.toLowerCase()}`;
+                            if (!seenSet.has(track.id) && !seenSet.has(trackKey)) {
+                                seenSet.add(track.id);
+                                seenSet.add(trackKey);
+
+                                let cover = track.coverImage;
+                                let preview = track.previewUrl;
+
+                                // Fast asynchronous fallback for artwork if null
+                                if (!cover) {
+                                    fetchTrackMetadata(track.title, track.artist).then(meta => {
+                                        if (meta?.coverImage) {
+                                            prisma.trackKnowledge.update({
+                                                where: { id: track.id },
+                                                data: { coverImage: meta.coverImage, previewUrl: meta.previewUrl }
+                                            }).catch(() => {});
+                                        }
+                                    }).catch(() => {});
+                                }
+
+                                centroidTracks.push({
+                                    id: track.spotifyId || track.id,
+                                    name: track.title,
+                                    artists: [{ name: track.artist }],
+                                    album: {
+                                        name: track.title,
+                                        images: [{ url: cover || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600' }]
+                                    },
+                                    uri: track.spotifyUri || `spotify:search:${encodeURIComponent(track.title + ' ' + track.artist)}`,
+                                    preview_url: preview,
+                                    external_urls: { spotify: `https://open.spotify.com/search/${encodeURIComponent(track.title + ' ' + track.artist)}` },
+                                    duration_ms: track.durationMs || 210000,
+                                    taste_match: true
+                                });
+
+                                if (centroidTracks.length >= 20) break;
+                            }
+                        }
+                    }
                 }
+            } catch (centroidErr) {
+                console.warn('[Swipe Feed] Taste Centroid calculation error:', centroidErr.message);
             }
-        } catch (ragErr) {
-            console.error('[Swipe Feed] RAG Vector Search failed, falling back to generic:', ragErr);
         }
 
-        if (selectedQueries.length === 0) {
-            // GENERIC FALLBACK (If no history or RAG failed)
-            const categories = {
-                hindiNew: ['hindi new', 'bollywood hits', 'punjabi 2024', 'trending india', 'arijit singh'],
-                hindiOld: ['bollywood 90s', 'bollywood 2000s', 'kishore kumar', 'lat mangeshkar', 'old hindi songs'],
-                englishNew: ['genre:pop', 'viral hits', 'top 50 global', 'genre:r-n-b'],
-                englishOld: ['year:1990-2010 pop', '90s hits', 'classic rock', 'year:2000-2010']
-            };
-            const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
-            selectedQueries = [
-                pickRandom(categories.hindiNew),
-                pickRandom(categories.hindiOld),
-                pickRandom(categories.englishNew),
-                pickRandom(categories.englishOld)
-            ];
+        // If we found enough centroid-matched tracks from our database, return them instantly (<100ms!)
+        if (centroidTracks.length >= 15) {
+            console.log(`[Swipe Feed] Served ${centroidTracks.length} tracks via Autonomous Taste Centroid.`);
+            return res.json({ tracks: centroidTracks });
         }
 
-        let candidates = [];
+        // 3. Fallback to Search Queries (for brand new users or sparse centroids)
+        let selectedQueries = [];
+        const categories = {
+            hindiNew: ['hindi new', 'bollywood hits', 'punjabi 2024', 'trending india', 'arijit singh'],
+            hindiOld: ['bollywood 90s', 'bollywood 2000s', 'kishore kumar', 'lata mangeshkar', 'old hindi songs'],
+            englishNew: ['genre:pop', 'viral hits', 'top 50 global', 'genre:r-n-b'],
+            englishOld: ['year:1990-2010 pop', '90s hits', 'classic rock', 'year:2000-2010']
+        };
+        const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+        selectedQueries = [
+            pickRandom(categories.hindiNew),
+            pickRandom(categories.hindiOld),
+            pickRandom(categories.englishNew),
+            pickRandom(categories.englishOld)
+        ];
+
+        let candidates = [...centroidTracks];
 
         for (const q of selectedQueries) {
             try {
-                // Determine if this is likely a Hindi query for market targeting
                 const isHindi = q.includes('hindi') || q.includes('bollywood') || q.includes('punjabi') || q.includes('india') || q.includes('kumar') || q.includes('singh');
                 const market = isHindi ? 'IN' : 'US';
-                const limit = 20;
-                // Increase offset range for more variety (avoid repeats)
-                const offset = Math.floor(Math.random() * 100); // Reduced offset slightly to ensure results exist
+                const limit = 15;
+                const offset = Math.floor(Math.random() * 80);
 
                 let results;
                 try {
@@ -107,33 +189,21 @@ router.get('/feed', authenticateToken, initSpotifyApi, async (req, res) => {
 
                 if (results && results.body.tracks && results.body.tracks.items.length > 0) {
                     candidates.push(...results.body.tracks.items);
-                } else {
-                    throw new Error("No Spotify results");
                 }
             } catch (err) {
-                console.warn(`[Swipe Feed] Spotify Search failed for ${q}. Falling back to YouTube...`);
                 try {
-                    const randomSuffixes = ["2023", "2024", "2025", "official video", "music video", "live", "lyrics", "hit song", "viral"];
-                    const suffix = randomSuffixes[Math.floor(Math.random() * randomSuffixes.length)];
-                    const ytTracks = await searchYouTubeMultiple(`${q} ${suffix}`, 5);
-                    if (ytTracks && ytTracks.length > 0) {
-                        candidates.push(...ytTracks);
-                    }
-                } catch (ytErr) {
-                    console.error(`[Swipe Feed] YouTube fallback failed for ${q}:`, ytErr);
-                }
+                    const ytTracks = await searchYouTubeMultiple(`${q} viral hits`, 5);
+                    if (ytTracks && ytTracks.length > 0) candidates.push(...ytTracks);
+                } catch (ytErr) {}
             }
         }
 
-        // 3. Filter Duplicates & Already Swiped
+        // Filter Duplicates & Already Swiped
         const uniqueTracks = [];
         const trackIds = new Set();
 
         for (const track of candidates) {
-            // Identifier for "seen" check
             const trackKey = `${track.name.toLowerCase()}:${track.artists[0].name.toLowerCase()}`;
-
-            // Check both ID and Name-Artist pair
             if (!trackIds.has(track.id) && !seenSet.has(track.id) && !seenSet.has(trackKey)) {
                 trackIds.add(track.id);
                 uniqueTracks.push({
@@ -148,9 +218,7 @@ router.get('/feed', authenticateToken, initSpotifyApi, async (req, res) => {
             }
         }
 
-        // 4. Shuffle Final Result
         const feed = uniqueTracks.sort(() => 0.5 - Math.random()).slice(0, 20);
-
         res.json({ tracks: feed });
 
     } catch (error) {
