@@ -23,10 +23,23 @@ export default function GeneratePage() {
     useEffect(() => {
         if (window.location.hostname === 'localhost') {
             window.location.href = window.location.href.replace('localhost', '127.0.0.1');
+            return;
         }
+
+        // Safeguard: If user was redirected here following an auth flow with a pending export or recently generated mix, return to /results
+        const pendingSpotify = localStorage.getItem('pendingSpotifySave');
+        const pendingYoutube = localStorage.getItem('pendingYoutubeSave');
+        const hasPlaylist = localStorage.getItem('playlistData');
+
+        if ((pendingSpotify || pendingYoutube) && hasPlaylist) {
+            console.log('[GeneratePage] Pending export detected after auth flow. Returning to /results...');
+            router.replace('/results');
+            return;
+        }
+
         // Clear any previous user image
         localStorage.removeItem('userImage');
-    }, []);
+    }, [router]);
 
     const handleGenerate = async () => {
         setIsLoading(true);

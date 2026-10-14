@@ -12,7 +12,7 @@ export default function DebugPage() {
     const handleProbe = async () => {
         if (!query.trim()) return;
         setLoading(true);
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
         try {
             const res = await fetch(`${apiUrl}/ai/vector-probe`, {
                 method: 'POST',

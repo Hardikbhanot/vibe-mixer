@@ -93,15 +93,37 @@ function ResultsContent() {
         }
         setLoading(false);
 
+        const authError = searchParams.get('error');
+        if (authError) {
+            localStorage.removeItem('pendingSpotifySave');
+            localStorage.removeItem('pendingYoutubeSave');
+            window.history.replaceState({}, '', '/results');
+            if (authError.includes('google')) {
+                toast.error("Google authentication failed. Opening instant YouTube mix fallback...");
+                openInstantYoutubeMix();
+            } else if (authError.includes('spotify') || authError.includes('auth')) {
+                toast.error("Spotify login was interrupted. Try connecting again or use YouTube fallback!");
+            }
+            return;
+        }
+
+        const spotifyConnected = searchParams.get('spotify_connected');
+        if (spotifyConnected) {
+            window.history.replaceState({}, '', '/results');
+            toast.success("Spotify connected successfully! 🎧");
+        }
+
         const googleConnected = searchParams.get('google_connected');
         if (googleConnected) {
             window.history.replaceState({}, '', '/results');
+            toast.success("Google connected successfully! 🎬");
         }
 
         // Auto-resume pending exports after OAuth redirect
         const pendingSpotify = localStorage.getItem('pendingSpotifySave');
         if (pendingSpotify && storedData) {
             localStorage.removeItem('pendingSpotifySave');
+            toast.info("Resuming Spotify export... 🎧");
             setTimeout(() => {
                 handleSaveToSpotify();
             }, 800);
@@ -110,6 +132,7 @@ function ResultsContent() {
         const pendingYoutube = localStorage.getItem('pendingYoutubeSave');
         if (pendingYoutube && storedData) {
             localStorage.removeItem('pendingYoutubeSave');
+            toast.info("Resuming YouTube export... 🎬");
             setTimeout(() => {
                 handleSaveToYoutube();
             }, 800);
@@ -318,8 +341,23 @@ function ResultsContent() {
 
     const openInstantYoutubeMix = () => {
         if (!data || !data.tracks.length) return;
-        const query = encodeURIComponent(`${data.playlist_name || (data as any).name || 'Mix'} ${data.tracks[0]?.name || ''}`);
-        window.open(`https://music.youtube.com/search?q=${query}`, '_blank');
+        const videoIds = data.tracks
+            .map((t: any) => {
+                if (t.videoId) return t.videoId;
+                if (t.external_urls?.youtube) {
+                    const match = t.external_urls.youtube.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+                    return match ? match[1] : null;
+                }
+                return null;
+            })
+            .filter(Boolean);
+
+        if (videoIds.length > 0) {
+            window.open(`https://www.youtube.com/watch_videos?video_ids=${videoIds.slice(0, 50).join(',')}`, '_blank');
+        } else {
+            const query = encodeURIComponent(`${data.playlist_name || (data as any).name || 'Mix'} ${data.tracks[0]?.name || ''}`);
+            window.open(`https://music.youtube.com/search?q=${query}`, '_blank');
+        }
     };
 
     const handleSaveToYoutube = async () => {
@@ -354,7 +392,7 @@ function ResultsContent() {
 
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.error || 'Failed to create YouTube playlist');
+                throw new Error(errData.details || errData.error || 'Failed to create YouTube playlist');
             }
 
             const result = await response.json();
@@ -367,7 +405,12 @@ function ResultsContent() {
             }
         } catch (error: any) {
             console.error('Error saving to YouTube:', error);
-            toast.error(error.message || 'YouTube save failed. Opening instant mix...');
+            toast.error(error.message || 'YouTube save failed. Opening instant mix fallback...', {
+                action: {
+                    label: 'Open Mix',
+                    onClick: () => openInstantYoutubeMix()
+                }
+            });
             openInstantYoutubeMix();
         } finally {
             setIsSavingYoutube(false);

@@ -279,7 +279,7 @@ router.get('/callback', async (req, res) => {
         const data = await spotifyApi.authorizationCodeGrant(code);
         const { access_token, refresh_token, expires_in } = data.body;
 
-        const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+        let clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
 
         console.log('[Spotify Callback] Success via Spotify API');
         console.log('------------------------------------------------');
@@ -410,8 +410,9 @@ router.get('/callback', async (req, res) => {
 
                 if (stateData.next) {
                     const target = stateData.next.startsWith('/') ? stateData.next : `/${stateData.next}`;
-                    console.log(`[Spotify Auth] Preserving user flow: redirecting back to ${clientUrl}${target}`);
-                    return res.redirect(`${clientUrl}${target}`);
+                    const sep = target.includes('?') ? '&' : '?';
+                    console.log(`[Spotify Auth] Preserving user flow: redirecting back to ${clientUrl}${target}${sep}spotify_connected=true`);
+                    return res.redirect(`${clientUrl}${target}${sep}spotify_connected=true`);
                 }
             } catch (e) {
                 console.error('[Spotify Auth] Failed to parse state:', e, 'Raw:', req.query.state);
@@ -425,16 +426,18 @@ router.get('/callback', async (req, res) => {
         res.redirect(`${clientUrl}/generate`);
     } catch (error) {
         console.error('Error during Spotify authentication:', error);
-        const clientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
-        res.redirect(`${clientUrl}/?error=auth_failed`);
+        let fallbackUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        if (req.query.state) {
+            try {
+                const parsed = JSON.parse(Buffer.from(req.query.state, 'base64').toString());
+                if (parsed.origin) fallbackUrl = parsed.origin;
+            } catch (e) {}
+        }
+        res.redirect(`${fallbackUrl}/results?error=auth_failed`);
     }
 });
 
-// --- Google / YouTube Auth ---
-
-router.get('/google', (req, res) => {
-    console.log('[Google Auth] Initiating...');
-    console.log('[Google Auth] Client ID:', process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.substring(0, 10) + '...' : 'MISSING');
+const getGoogleRedirectUri = () => {
     let redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://127.0.0.1:4000/auth/google/callback';
 
     // Auto-fix common configuration error where /auth/ prefix is missing
@@ -442,7 +445,15 @@ router.get('/google', (req, res) => {
         console.warn(`[Google Auth] Warning: GOOGLE_REDIRECT_URI (${redirectUri}) appears to be missing '/auth' prefix. Auto-correcting...`);
         redirectUri = redirectUri.replace('/google/callback', '/auth/google/callback');
     }
+    return redirectUri;
+};
 
+// --- Google / YouTube Auth ---
+
+router.get('/google', (req, res) => {
+    console.log('[Google Auth] Initiating...');
+    console.log('[Google Auth] Client ID:', process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.substring(0, 10) + '...' : 'MISSING');
+    const redirectUri = getGoogleRedirectUri();
     console.log('[Google Auth] Redirect URI:', redirectUri);
 
     const scopes = [
@@ -469,12 +480,21 @@ router.get('/google', (req, res) => {
 router.get('/google/callback', async (req, res) => {
     const code = req.query.code || null;
 
+    let fallbackClientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+    if (req.query.state) {
+        try {
+            const parsed = JSON.parse(Buffer.from(req.query.state, 'base64').toString());
+            if (parsed.origin) fallbackClientUrl = parsed.origin;
+        } catch (e) {}
+    }
+
     if (!code) {
-        const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-        return res.redirect(`${clientUrl}/results?error=google_auth_failed`);
+        return res.redirect(`${fallbackClientUrl}/results?error=google_auth_failed`);
     }
 
     try {
+        const redirectUri = getGoogleRedirectUri();
+        console.log('[Google Auth Callback] Using normalized redirect_uri:', redirectUri);
         const response = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
             headers: {
@@ -484,7 +504,7 @@ router.get('/google/callback', async (req, res) => {
                 code: code,
                 client_id: process.env.GOOGLE_CLIENT_ID,
                 client_secret: process.env.GOOGLE_CLIENT_SECRET,
-                redirect_uri: process.env.GOOGLE_REDIRECT_URI || 'http://127.0.0.1:4000/auth/google/callback',
+                redirect_uri: redirectUri,
                 grant_type: 'authorization_code',
             }),
         });
@@ -493,8 +513,7 @@ router.get('/google/callback', async (req, res) => {
 
         if (data.error) {
             console.error('Google Token Error:', data);
-            const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-            return res.redirect(`${clientUrl}/results?error=google_token_error`);
+            return res.redirect(`${fallbackClientUrl}/results?error=google_token_error`);
         }
 
         const { access_token, refresh_token, expires_in } = data;
@@ -588,8 +607,9 @@ router.get('/google/callback', async (req, res) => {
 
                 if (stateData.next) {
                     const target = stateData.next.startsWith('/') ? stateData.next : `/${stateData.next}`;
-                    console.log(`[Google Auth] Preserving user flow: redirecting back to ${clientUrl}${target}`);
-                    return res.redirect(`${clientUrl}${target}`);
+                    const sep = target.includes('?') ? '&' : '?';
+                    console.log(`[Google Auth] Preserving user flow: redirecting back to ${clientUrl}${target}${sep}google_connected=true`);
+                    return res.redirect(`${clientUrl}${target}${sep}google_connected=true`);
                 }
             } catch (e) {
                 console.error('[Google Auth] Failed to parse state:', e, 'Raw State:', req.query.state);
@@ -605,8 +625,14 @@ router.get('/google/callback', async (req, res) => {
 
     } catch (error) {
         console.error('Google Auth Error:', error);
-        const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-        res.redirect(`${clientUrl}/results?error=server_error`);
+        let fallbackUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+        if (req.query.state) {
+            try {
+                const parsed = JSON.parse(Buffer.from(req.query.state, 'base64').toString());
+                if (parsed.origin) fallbackUrl = parsed.origin;
+            } catch (e) {}
+        }
+        res.redirect(`${fallbackUrl}/results?error=server_error`);
     }
 });
 

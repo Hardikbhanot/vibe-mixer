@@ -119,7 +119,7 @@ export const Header = () => {
                             </div>
                         ) : (
                             <div className="flex items-center gap-2">
-                                <Link href="/auth" className="hidden sm:block">
+                                <Link href={`/auth${pathname && pathname !== '/' ? `?next=${encodeURIComponent(pathname)}` : ''}`} className="hidden sm:block">
                                     <button className="px-4 py-2 text-xs font-semibold text-white/70 hover:text-white transition-colors">
                                         Sign In
                                     </button>

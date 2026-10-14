@@ -5,6 +5,14 @@ import { useRouter } from "next/navigation";
 
 const AuthContext = createContext<any>(null);
 
+const getApiUrl = () => {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return 'http://localhost:4000';
+  }
+  return 'http://127.0.0.1:4000';
+};
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -16,7 +24,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const checkUserLoggedIn = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const apiUrl = getApiUrl();
       const res = await fetch(`${apiUrl}/auth/me`, { credentials: 'include' });
 
       if (res.ok) {
@@ -35,7 +43,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = async (email: any, password: any) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const apiUrl = getApiUrl();
       const res = await fetch(`${apiUrl}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,7 +72,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const apiUrl = getApiUrl();
       await fetch(`${apiUrl}/auth/logout`, {
         method: 'POST',
         credentials: 'include'

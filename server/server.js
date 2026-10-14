@@ -46,6 +46,10 @@ app.use((req, res, next) => {
 });
 
 // Routes
+app.get('/google/callback', (req, res) => {
+  const query = new URLSearchParams(req.query).toString();
+  res.redirect(`/auth/google/callback${query ? `?${query}` : ''}`);
+});
 app.use('/auth', authRoutes);
 app.use('/spotify', spotifyRoutes);
 app.use('/ai', aiRoutes);
