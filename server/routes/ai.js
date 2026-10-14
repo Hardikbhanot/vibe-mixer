@@ -1,5 +1,5 @@
 import express from 'express';
-import { generatePlaylistParams, analyzeImage, generateVibeAnalysis, extractMusicalKeywords } from '../services/groq.js';
+import { generatePlaylistParams, analyzeImage, generateVibeAnalysis, extractMusicalKeywords, refinePlaylistWithAI } from '../services/groq.js';
 import { generateImage } from '../services/imagen.js';
 import { generateEmbedding } from '../services/embedding.js';
 import { initSpotifyApi } from '../middleware/spotifyAuth.js';
@@ -605,6 +605,91 @@ router.post('/vector-probe', async (req, res) => {
     } catch (error) {
         console.error('Vector Probe Error:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// --- 4. Interactive Conversational Playlist Refinement with AI DJ ---
+router.post('/refine', async (req, res) => {
+    try {
+        const { instruction, currentTracks = [], playlistName = "", playlistDescription = "" } = req.body;
+
+        if (!instruction || typeof instruction !== 'string') {
+            return res.status(400).json({ error: 'Instruction is required' });
+        }
+
+        console.log(`[AI Refine] Processing instruction: "${instruction}" for ${currentTracks.length} tracks.`);
+
+        const result = await refinePlaylistWithAI(instruction, currentTracks, playlistName, playlistDescription);
+
+        // Map existing tracks by normalized key or ID for instant lookup
+        const trackMap = new Map();
+        currentTracks.forEach(t => {
+            if (t.id) trackMap.set(t.id, t);
+            const key = `${(t.name || '').toLowerCase()}:${(t.artist || t.artists?.[0]?.name || '').toLowerCase()}`;
+            trackMap.set(key, t);
+        });
+
+        // Resolve tracks with iTunes and 2-tier platform URLs
+        const finalTracks = await Promise.all((result.updatedTracks || []).map(async (item, idx) => {
+            const key = `${(item.name || '').toLowerCase()}:${(item.artist || '').toLowerCase()}`;
+            const existing = (item.id && trackMap.get(item.id)) || trackMap.get(key);
+
+            if (existing && !item.isNew) {
+                return {
+                    ...existing,
+                    ai_reason: item.reason || existing.ai_reason || "Refined by AI DJ."
+                };
+            }
+
+            // For newly added or replaced songs, resolve high-res metadata
+            let cover = '/placeholder.png';
+            let preview = null;
+            let duration = 210000;
+
+            try {
+                const meta = await fetchTrackMetadata(item.name, item.artist);
+                if (meta) {
+                    cover = meta.coverImage || cover;
+                    preview = meta.previewUrl || null;
+                    duration = meta.durationMs || duration;
+                }
+            } catch (mErr) {}
+
+            const cleanSpotifySearch = `https://open.spotify.com/search/${encodeURIComponent(item.name + ' ' + item.artist)}`;
+            const cleanYoutubeSearch = `https://www.youtube.com/results?search_query=${encodeURIComponent(item.name + ' ' + item.artist)}`;
+
+            return {
+                id: item.id || `refined_${Date.now()}_${idx}`,
+                name: item.name,
+                artist: item.artist,
+                artists: [{ name: item.artist }],
+                album: {
+                    name: item.name,
+                    images: [{ url: cover }]
+                },
+                image: cover,
+                duration_ms: duration,
+                uri: `spotify:search:${encodeURIComponent(item.name + ' ' + item.artist)}`,
+                external_urls: {
+                    spotify: cleanSpotifySearch,
+                    youtube: cleanYoutubeSearch
+                },
+                preview_url: preview,
+                ai_reason: item.reason || "Handpicked by AI DJ to fit your requested vibe.",
+                confidence_score: 95,
+                match_type: "AI Refined"
+            };
+        }));
+
+        res.json({
+            success: true,
+            assistantReply: result.assistantReply || "I've refined your playlist with your requested changes!",
+            tracks: finalTracks
+        });
+
+    } catch (error) {
+        console.error('[AI Refine] Error:', error);
+        res.status(500).json({ error: error.message || 'Failed to refine playlist' });
     }
 });
 

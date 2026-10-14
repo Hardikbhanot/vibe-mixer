@@ -28,6 +28,7 @@ export default function ChatInterface({ partnerId, partnerName, partnerAvatar }:
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [socketConnected, setSocketConnected] = useState(false);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -38,8 +39,6 @@ export default function ChatInterface({ partnerId, partnerName, partnerAvatar }:
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
             const res = await fetch(`${apiUrl}/api/messages/${partnerId}`, {
-                headers: { 'Authorization': `Bearer ${user.token}` }, // Assuming cookie auth, but sending bearer just in case logic changes. Actually context doesn't expose token usually if HTTPOnly. 
-                // Wait, AuthContext uses cookies. So standard fetch credentials include should work.
                 credentials: 'include'
             });
             const data = await res.json();
@@ -53,10 +52,74 @@ export default function ChatInterface({ partnerId, partnerName, partnerAvatar }:
         }
     };
 
+    // Initial fetch + Periodic sync
     useEffect(() => {
         fetchMessages();
-        const interval = setInterval(fetchMessages, 3000); // Poll every 3s
+        const interval = setInterval(fetchMessages, 10000); // 10s fallback sync
         return () => clearInterval(interval);
+    }, [partnerId, user]);
+
+    // Real-Time WebSockets for instant message streaming
+    useEffect(() => {
+        if (!user) return;
+
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+        const wsProtocol = apiUrl.startsWith('https') ? 'wss:' : 'ws:';
+        const wsHost = apiUrl.replace(/^https?:\/\//, '');
+        const wsUrl = `${wsProtocol}//${wsHost}/ws/chat`;
+
+        let socket: WebSocket | null = null;
+        let reconnectTimeout: any = null;
+
+        const connect = () => {
+            try {
+                socket = new WebSocket(wsUrl);
+
+                socket.onopen = () => {
+                    setSocketConnected(true);
+                    socket?.send(JSON.stringify({ type: 'auth', userId: user.id }));
+                };
+
+                socket.onmessage = (event) => {
+                    try {
+                        const payload = JSON.parse(event.data);
+                        if (payload.type === 'new_message' && payload.message) {
+                            const msg = payload.message;
+                            if (
+                                (msg.senderId === partnerId && msg.receiverId === user.id) ||
+                                (msg.senderId === user.id && msg.receiverId === partnerId)
+                            ) {
+                                setMessages((prev) => {
+                                    if (prev.some((m) => m.id === msg.id)) return prev;
+                                    return [...prev, msg];
+                                });
+                            }
+                        }
+                    } catch (e) {}
+                };
+
+                socket.onclose = () => {
+                    setSocketConnected(false);
+                    reconnectTimeout = setTimeout(connect, 3000);
+                };
+
+                socket.onerror = () => {
+                    setSocketConnected(false);
+                };
+            } catch (err) {
+                console.warn('[WebSocket] Init failed:', err);
+            }
+        };
+
+        connect();
+
+        return () => {
+            if (reconnectTimeout) clearTimeout(reconnectTimeout);
+            if (socket) {
+                socket.onclose = null;
+                socket.close();
+            }
+        };
     }, [partnerId, user]);
 
     useEffect(() => {
@@ -65,21 +128,41 @@ export default function ChatInterface({ partnerId, partnerName, partnerAvatar }:
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim()) return;
+        if (!newMessage.trim() || !user) return;
 
-        // Optimistic UI update could go here, but let's rely on fetch for consistency first
+        const messageText = newMessage.trim();
+        setNewMessage('');
+
+        // Optimistic UI append
+        const tempId = `temp_${Date.now()}`;
+        const optimisticMsg: Message = {
+            id: tempId,
+            content: messageText,
+            senderId: user.id,
+            sender: {
+                username: user.username || user.email || 'Me',
+                avatarUrl: user.avatarUrl
+            },
+            createdAt: new Date().toISOString()
+        };
+        setMessages((prev) => [...prev, optimisticMsg]);
+
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
-            await fetch(`${apiUrl}/api/messages/send`, {
+            const res = await fetch(`${apiUrl}/api/messages/send`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ receiverId: partnerId, content: newMessage }),
+                body: JSON.stringify({ receiverId: partnerId, content: messageText }),
                 credentials: 'include'
             });
-            setNewMessage('');
-            fetchMessages(); // Instant refresh
+            const data = await res.json();
+            if (data.message) {
+                setMessages((prev) =>
+                    prev.map((m) => (m.id === tempId ? data.message : m))
+                );
+            }
         } catch (error) {
-            console.error('Failed to send', error);
+            console.error('Failed to send message:', error);
         }
     };
 

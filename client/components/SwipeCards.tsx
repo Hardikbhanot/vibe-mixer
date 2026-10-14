@@ -31,7 +31,8 @@ const SwipeCards = ({ tracks, onEmpty }: SwipeCardsProps) => {
         if (track.uri?.startsWith('spotify:track:')) {
             return `https://open.spotify.com/track/${track.uri.replace('spotify:track:', '')}`;
         }
-        if (track.id && !track.id.startsWith('itunes_') && !track.id.startsWith('yt_')) {
+        // Only treat as Spotify Track ID if valid 22-char alphanumeric (not UUID)
+        if (track.id && /^[0-9A-Za-z]{22}$/.test(track.id)) {
             return `https://open.spotify.com/track/${track.id}`;
         }
         const artist = track.artists?.[0]?.name || '';
@@ -247,6 +248,12 @@ const Card = ({ track, isTop, onSwipe, onPlay }: { track: Track; isTop: boolean;
         }
     };
 
+    const [imgSrc, setImgSrc] = useState<string>(track.album?.images?.[0]?.url || '/placeholder.png');
+
+    useEffect(() => {
+        setImgSrc(track.album?.images?.[0]?.url || '/placeholder.png');
+    }, [track.album?.images]);
+
     return (
         <motion.div
             style={{ x, y, rotate, zIndex: isTop ? 10 : 0 }}
@@ -267,13 +274,12 @@ const Card = ({ track, isTop, onSwipe, onPlay }: { track: Track; isTop: boolean;
             )}
 
             {/* Album Art - Clickable for Play */}
-            <div className="relative w-full aspect-square mb-4 rounded-xl overflow-hidden shadow-inner group">
-                <Image
-                    src={track.album.images[0]?.url}
+            <div className="relative w-full aspect-square mb-4 rounded-xl overflow-hidden shadow-inner group bg-zinc-900 flex items-center justify-center">
+                <img
+                    src={imgSrc}
                     alt={track.name}
-                    fill
-                    className="object-cover pointer-events-none group-hover:scale-105 transition-transform duration-500"
-                    sizes="(max-width: 768px) 100vw, 300px"
+                    onError={() => setImgSrc('/placeholder.png')}
+                    className="w-full h-full object-cover pointer-events-none group-hover:scale-105 transition-transform duration-500"
                 />
                 {isTop && (
                     <div

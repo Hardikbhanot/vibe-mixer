@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
 import prisma from '../lib/prisma.js';
+import { sendToUser } from '../services/websocket.js';
 
 const router = express.Router();
 
@@ -24,6 +25,12 @@ router.post('/send', authenticateToken, async (req, res) => {
                 sender: { select: { id: true, username: true, avatarUrl: true } },
                 receiver: { select: { id: true, username: true, avatarUrl: true } }
             }
+        });
+
+        // Broadcast in real-time to the recipient if connected via WebSocket
+        sendToUser(receiverId, {
+            type: 'new_message',
+            message
         });
 
         res.json({ message });

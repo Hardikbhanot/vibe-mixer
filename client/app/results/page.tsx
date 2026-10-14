@@ -55,6 +55,19 @@ function ResultsContent() {
     const [imageLoaded, setImageLoaded] = useState(false);
     const [isPublic, setIsPublic] = useState(false);
 
+    // Dynamic Save & Export States
+    const [isSavedToLibrary, setIsSavedToLibrary] = useState(false);
+    const [isSavingLibrary, setIsSavingLibrary] = useState(false);
+    const [isSavedToSpotify, setIsSavedToSpotify] = useState(false);
+    const [spotifyPlaylistUrl, setSpotifyPlaylistUrl] = useState<string | null>(null);
+    const [isSavedToYoutube, setIsSavedToYoutube] = useState(false);
+    const [youtubePlaylistUrl, setYoutubePlaylistUrl] = useState<string | null>(null);
+
+    // AI Vibe DJ Chat State
+    const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([]);
+    const [chatInput, setChatInput] = useState('');
+    const [isRefining, setIsRefining] = useState(false);
+
     useEffect(() => {
         const storedData = localStorage.getItem('playlistData');
 
@@ -164,16 +177,15 @@ function ResultsContent() {
     };
 
     const handleSaveToLibrary = async () => {
-        if (!data) return;
+        if (!data || isSavingLibrary) return;
+        setIsSavingLibrary(true);
         try {
-            const apiUrl = '';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
 
-            // Check auth via cookie/session
-            // Note: /api/playlists is correctly handled by rewrite to /api/playlists (which goes to backend)
             const response = await fetch(`${apiUrl}/api/playlists`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                credentials: 'include', // Sends the auth_token cookie
+                credentials: 'include',
                 body: JSON.stringify({
                     name: data.playlist_name,
                     description: data.playlist_description,
@@ -183,9 +195,9 @@ function ResultsContent() {
                         id: t.id,
                         name: t.name,
                         uri: t.uri,
-                        artist: t.artists[0]?.name || 'Unknown',
+                        artist: t.artist || t.artists?.[0]?.name || 'Unknown',
                         album: t.album?.name,
-                        image: t.album?.images[0]?.url,
+                        image: t.image || t.album?.images?.[0]?.url,
                         duration_ms: t.duration_ms
                     })),
                     isPublic: isPublic
@@ -193,24 +205,31 @@ function ResultsContent() {
             });
 
             if (response.ok) {
-                toast.success("Saved to your profile!");
+                setIsSavedToLibrary(true);
+                toast.success("Saved to your profile library! 📚");
             } else if (response.status === 401) {
                 toast.error("Please login to save to library");
-                router.push('/auth');
+                router.push('/auth?next=/results');
             } else {
                 toast.error("Failed to save.");
             }
         } catch (e) {
             console.error(e);
             toast.error("Network error when saving.");
+        } finally {
+            setIsSavingLibrary(false);
         }
     };
+
     const getTrackSpotifyUrl = (t: Track) => {
-        if (t.external_urls?.spotify) return t.external_urls.spotify;
+        if (t.external_urls?.spotify && !t.external_urls.spotify.includes('undefined')) {
+            return t.external_urls.spotify;
+        }
         if (t.uri?.startsWith('spotify:track:')) {
             return `https://open.spotify.com/track/${t.uri.replace('spotify:track:', '')}`;
         }
-        if (t.id && !t.id.startsWith('itunes_') && !t.id.startsWith('yt_')) {
+        // ONLY valid Spotify 22-character alphanumeric ID (never arbitrary database UUID)
+        if (t.id && /^[0-9A-Za-z]{22}$/.test(t.id)) {
             return `https://open.spotify.com/track/${t.id}`;
         }
         const artist = t.artist || t.artists?.[0]?.name || '';
@@ -242,7 +261,7 @@ function ResultsContent() {
 
             if (response.status === 401) {
                 toast.error("Spotify not connected. Redirecting to Spotify login...");
-                window.location.href = `${apiUrl}/auth/login`;
+                window.location.href = `${apiUrl}/auth/login?next=/results`;
                 return;
             }
 
@@ -252,9 +271,12 @@ function ResultsContent() {
             }
 
             const result = await response.json();
-            toast.success('Spotify Playlist created successfully!');
-            if (result.external_urls?.spotify) {
-                window.open(result.external_urls.spotify, '_blank');
+            setIsSavedToSpotify(true);
+            const playlistUrl = result.external_urls?.spotify || (result.id ? `https://open.spotify.com/playlist/${result.id}` : null);
+            setSpotifyPlaylistUrl(playlistUrl);
+            toast.success('Spotify Playlist created successfully! 🎧');
+            if (playlistUrl) {
+                window.open(playlistUrl, '_blank');
             }
         } catch (error: any) {
             console.error('Error saving playlist:', error);
@@ -288,15 +310,77 @@ function ResultsContent() {
             if (!response.ok) throw new Error('Failed to create playlist');
 
             const result = await response.json();
-            toast.success('YouTube Playlist created successfully!');
+            setIsSavedToYoutube(true);
+            setYoutubePlaylistUrl(result.playlistUrl || null);
+            toast.success('YouTube Playlist created successfully! 🎬');
             if (result.playlistUrl) {
                 window.open(result.playlistUrl, '_blank');
             }
         } catch (error) {
             console.error('Error saving to YouTube:', error);
-            toast.error('Failed to save playlist.');
+            toast.error('Failed to save playlist to YouTube.');
         } finally {
             setIsSavingYoutube(false);
+        }
+    };
+
+    // Chat with AI DJ Refine Handler
+    const handleRefine = async (instructionToRun?: string) => {
+        const text = (instructionToRun || chatInput).trim();
+        if (!text || isRefining || !data) return;
+
+        setChatInput('');
+        setIsRefining(true);
+
+        const newMessages = [...chatMessages, { role: 'user' as const, text }];
+        setChatMessages(newMessages);
+
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+            const response = await fetch(`${apiUrl}/ai/refine`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    instruction: text,
+                    currentTracks: data.tracks,
+                    playlistName: data.playlist_name,
+                    playlistDescription: data.playlist_description
+                }),
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || 'Failed to refine playlist');
+            }
+
+            const resData = await response.json();
+
+            if (resData.tracks && Array.isArray(resData.tracks)) {
+                const updatedPlaylist = {
+                    ...data,
+                    tracks: resData.tracks,
+                    total_duration_mins: Math.round(resData.tracks.reduce((acc: number, t: any) => acc + (t.duration_ms || 210000), 0) / 60000)
+                };
+                setData(updatedPlaylist);
+                localStorage.setItem('playlistData', JSON.stringify(updatedPlaylist));
+
+                setChatMessages([
+                    ...newMessages,
+                    { role: 'assistant', text: resData.assistantReply || "I've updated your mix with the new tracks!" }
+                ]);
+
+                toast.success("Mix updated by AI DJ! ✨");
+            }
+        } catch (e: any) {
+            console.error('Refine failed:', e);
+            toast.error(e.message || "Failed to tweak mix.");
+            setChatMessages([
+                ...newMessages,
+                { role: 'assistant', text: "Sorry, I had trouble adjusting the mix. Could you try rephrasing?" }
+            ]);
+        } finally {
+            setIsRefining(false);
         }
     };
 
@@ -389,56 +473,218 @@ function ResultsContent() {
                             <p className="text-foreground/70 text-base mt-2">{data.playlist_description}</p>
                             <p className="text-muted-foreground text-sm mt-1">{data.tracks.length} Tracks • {data.total_duration_mins || Math.round(data.tracks.reduce((acc, t) => acc + t.duration_ms, 0) / 60000)} mins</p>
                         </div>
-                        <div className="flex flex-wrap gap-3 justify-center md:justify-start">
-                            {user ? ( // <--- Changed from !data.isGuest
-                                <button onClick={handleSaveToSpotify} disabled={isSaving} className="flex items-center justify-center gap-2 h-10 px-6 bg-[#1DB954] text-white text-sm font-bold rounded-full hover:scale-105 transition-transform disabled:opacity-50">
-                                    <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_White.png" alt="Spotify" className="h-5 w-auto" />
-                                    {isSaving ? 'Saving...' : 'Save to Spotify'}
-                                </button>
-                            ) : (
-                                <button onClick={() => { window.location.href = `/auth/login`; }} className="flex items-center justify-center gap-2 h-10 px-6 bg-transparent border border-[#1DB954] text-[#1DB954] text-sm font-bold rounded-full hover:bg-[#1DB954] hover:text-white transition-colors">
-                                    <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_Green.png" alt="Spotify" className="h-5 w-auto" />
-                                    Login to Save
-                                </button>
-                            )}
-                            <button onClick={handleSaveToYoutube} disabled={isSavingYoutube} className="flex items-center justify-center gap-2 h-10 px-6 bg-[#FF0000] text-white text-sm font-bold rounded-full hover:scale-105 transition-transform disabled:opacity-50">
-                                <span className="material-symbols-outlined text-xl">play_circle</span>
-                                {isSavingYoutube ? 'Creating...' : 'Save to YouTube'}
-                            </button>
-                            <div className="flex items-center gap-2 bg-surface-light dark:bg-surface-dark px-3 py-2 rounded-full border border-foreground/10 h-10">
-                                <span className={`text-xs font-bold ${isPublic ? 'text-primary' : 'text-muted-foreground'}`}>
-                                    {isPublic ? 'Public' : 'Private'}
-                                </span>
+                        {/* Aligned 2-Tier Streaming Exports & Actions Toolbar */}
+                        <div className="flex flex-col gap-3 w-full">
+                            {/* Primary Streaming Exports (2-Tier: Spotify 1st, YouTube 2nd) */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full">
+                                {user?.hasSpotify !== false ? (
+                                    <button
+                                        onClick={handleSaveToSpotify}
+                                        disabled={isSaving}
+                                        className={`relative flex items-center justify-center gap-2 h-11 px-5 rounded-xl font-bold text-sm transition-all duration-300 shadow-md ${
+                                            isSavedToSpotify
+                                                ? 'bg-[#1DB954] text-white ring-2 ring-[#1DB954]/50'
+                                                : 'bg-[#1DB954] hover:bg-[#1ed760] text-white hover:scale-[1.02] active:scale-[0.98]'
+                                        } disabled:opacity-50`}
+                                    >
+                                        <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_White.png" alt="Spotify" className="h-5 w-auto" />
+                                        <span>{isSaving ? 'Exporting...' : isSavedToSpotify ? 'Saved to Spotify ✓' : 'Save to Spotify'}</span>
+                                        {spotifyPlaylistUrl && (
+                                            <a
+                                                href={spotifyPlaylistUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="ml-1 p-1 hover:bg-black/20 rounded-md"
+                                                title="Open in Spotify"
+                                            >
+                                                <span className="material-symbols-outlined text-sm">open_in_new</span>
+                                            </a>
+                                        )}
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => {
+                                            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+                                            window.location.href = `${apiUrl}/auth/login?next=/results`;
+                                        }}
+                                        className="flex items-center justify-center gap-2 h-11 px-5 rounded-xl bg-transparent border-2 border-[#1DB954] text-[#1DB954] font-bold text-sm hover:bg-[#1DB954] hover:text-white transition-all duration-300"
+                                    >
+                                        <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_Green.png" alt="Spotify" className="h-5 w-auto" />
+                                        <span>Connect Spotify to Save</span>
+                                    </button>
+                                )}
+
                                 <button
-                                    onClick={() => setIsPublic(!isPublic)}
-                                    className={`w-10 h-5 rounded-full relative transition-colors ${isPublic ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-700'}`}
+                                    onClick={handleSaveToYoutube}
+                                    disabled={isSavingYoutube}
+                                    className={`flex items-center justify-center gap-2 h-11 px-5 rounded-xl font-bold text-sm transition-all duration-300 shadow-md ${
+                                        isSavedToYoutube
+                                            ? 'bg-[#FF0000] text-white ring-2 ring-red-500/50'
+                                            : 'bg-[#FF0000] hover:bg-red-600 text-white hover:scale-[1.02] active:scale-[0.98]'
+                                    } disabled:opacity-50`}
                                 >
-                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${isPublic ? 'left-[22px]' : 'left-0.5'}`} />
+                                    <span className="material-symbols-outlined text-xl">play_circle</span>
+                                    <span>{isSavingYoutube ? 'Exporting...' : isSavedToYoutube ? 'Saved to YouTube ✓' : 'Save to YouTube'}</span>
+                                    {youtubePlaylistUrl && (
+                                        <a
+                                            href={youtubePlaylistUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="ml-1 p-1 hover:bg-black/20 rounded-md"
+                                            title="Open in YouTube"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">open_in_new</span>
+                                        </a>
+                                    )}
                                 </button>
                             </div>
-                            <button
-                                onClick={handleSaveToLibrary}
-                                className="flex items-center justify-center gap-2 h-10 px-6 bg-surface-light dark:bg-surface-dark border border-foreground/10 hover:bg-foreground/5 text-sm font-bold rounded-full transition-colors"
-                            >
-                                <span className="material-symbols-outlined text-xl">bookmark</span>
-                                Save
-                            </button>
-                            {/* Debug button removed */}
-                            <button
-                                onClick={handleShareToInstagram}
-                                disabled={isSharing}
-                                className="flex items-center justify-center gap-2 h-10 px-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-bold rounded-full hover:scale-105 transition-transform disabled:opacity-50"
-                            >
-                                <span className="material-symbols-outlined text-xl">ios_share</span>
-                                {isSharing ? 'Generating...' : 'Share Story'}
-                            </button>
 
-                            <Link href="/results/breakdown" className="flex items-center justify-center gap-2 h-10 px-6 bg-gray-800 text-white text-sm font-bold rounded-full hover:bg-gray-700 transition-colors">
-                                <span className="material-symbols-outlined text-xl">analytics</span>
-                                Why?
-                            </Link>
+                            {/* Secondary Actions Toolbar: Save (Library), Public/Private, Story, Why? */}
+                            <div className="flex flex-wrap items-center gap-2 w-full">
+                                {/* Save to Library Button (Filled Icon & Animated on Save) */}
+                                <button
+                                    onClick={handleSaveToLibrary}
+                                    disabled={isSavingLibrary}
+                                    className={`flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl text-sm font-bold border transition-all duration-300 ${
+                                        isSavedToLibrary
+                                            ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 scale-[1.02] shadow-sm shadow-amber-500/20'
+                                            : 'bg-surface-light dark:bg-white/[0.04] border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/[0.08] text-foreground'
+                                    } active:scale-95`}
+                                    title="Save to your profile library"
+                                >
+                                    <span
+                                        className={`material-symbols-outlined text-xl transition-all duration-300 ${
+                                            isSavedToLibrary ? 'scale-125 text-amber-400 animate-bounce' : ''
+                                        }`}
+                                        style={isSavedToLibrary ? { fontVariationSettings: "'FILL' 1" } : undefined}
+                                    >
+                                        bookmark
+                                    </span>
+                                    <span>{isSavingLibrary ? 'Saving...' : isSavedToLibrary ? 'Saved' : 'Save'}</span>
+                                </button>
+
+                                {/* Public / Private Pill Switch */}
+                                <div className="flex items-center gap-2 bg-surface-light dark:bg-white/[0.04] px-3 h-10 rounded-xl border border-black/10 dark:border-white/10">
+                                    <span className={`text-xs font-bold transition-colors ${isPublic ? 'text-primary' : 'text-muted-foreground'}`}>
+                                        {isPublic ? 'Public' : 'Private'}
+                                    </span>
+                                    <button
+                                        onClick={() => setIsPublic(!isPublic)}
+                                        className={`w-9 h-5 rounded-full relative transition-colors ${isPublic ? 'bg-primary' : 'bg-gray-400 dark:bg-gray-700'}`}
+                                        aria-label="Toggle Public or Private"
+                                    >
+                                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${isPublic ? 'left-[18px]' : 'left-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                {/* Share Story */}
+                                <button
+                                    onClick={handleShareToInstagram}
+                                    disabled={isSharing}
+                                    className="flex items-center justify-center gap-1.5 h-10 px-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-bold rounded-xl hover:scale-105 active:scale-95 transition-all shadow-md shadow-pink-500/20 disabled:opacity-50"
+                                >
+                                    <span className="material-symbols-outlined text-lg">ios_share</span>
+                                    <span>{isSharing ? 'Generating...' : 'Share Story'}</span>
+                                </button>
+
+                                {/* Why? Button */}
+                                <Link
+                                    href="/results/breakdown"
+                                    className="flex items-center justify-center gap-1.5 h-10 px-4 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-bold rounded-xl transition-colors border border-white/10 ml-auto"
+                                >
+                                    <span className="material-symbols-outlined text-lg text-purple-400">analytics</span>
+                                    <span>Why?</span>
+                                </Link>
+                            </div>
                         </div>
                     </div>
+                </div>
+
+                {/* Interactive Chat with AI Vibe DJ */}
+                <div className="bg-surface-light dark:bg-[#141418] rounded-2xl p-5 border border-purple-500/25 shadow-xl mb-8 space-y-3.5 backdrop-blur-sm">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-600 to-cyan-400 flex items-center justify-center shadow-md shadow-purple-500/20">
+                                <span className="material-symbols-outlined text-lg text-white">auto_awesome</span>
+                            </div>
+                            <div>
+                                <h4 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+                                    Chat with AI Vibe DJ
+                                    <span className="text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                        Live Refine
+                                    </span>
+                                </h4>
+                                <p className="text-xs text-muted-foreground">Ask to add, remove, or swap songs in real-time</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Quick Suggestion Pills */}
+                    <div className="flex flex-wrap gap-1.5">
+                        {[
+                            "⚡ Add 3 more energetic songs",
+                            "🌧️ Make it chill & acoustic",
+                            "🗑️ Remove the slowest track",
+                            "✨ Add popular Indian hits"
+                        ].map((chip) => (
+                            <button
+                                key={chip}
+                                onClick={() => handleRefine(chip)}
+                                disabled={isRefining}
+                                className="text-xs px-3 py-1 rounded-full bg-white/[0.04] hover:bg-purple-500/20 border border-white/[0.08] hover:border-purple-500/40 text-foreground transition-all disabled:opacity-50"
+                            >
+                                {chip}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Chat Messages Log */}
+                    {chatMessages.length > 0 && (
+                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                            {chatMessages.map((msg, i) => (
+                                <div
+                                    key={i}
+                                    className={`flex text-xs p-3 rounded-xl ${
+                                        msg.role === 'user'
+                                            ? 'bg-white/[0.06] text-foreground ml-8 justify-end'
+                                            : 'bg-purple-900/30 border border-purple-500/30 text-purple-100 mr-8'
+                                    }`}
+                                >
+                                    <p className="leading-relaxed">{msg.text}</p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Chat Input Form */}
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            handleRefine();
+                        }}
+                        className="flex gap-2"
+                    >
+                        <input
+                            type="text"
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
+                            placeholder="e.g. 'Remove track 2 and add 2 fast techno songs'..."
+                            disabled={isRefining}
+                            className="flex-1 px-4 py-2.5 rounded-xl bg-background-light dark:bg-black/50 border border-black/10 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-foreground disabled:opacity-50"
+                        />
+                        <button
+                            type="submit"
+                            disabled={isRefining || !chatInput.trim()}
+                            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-primary text-white font-bold text-xs hover:opacity-90 transition-all flex items-center gap-1.5 shadow-md shadow-purple-500/20 disabled:opacity-40"
+                        >
+                            <span className={`material-symbols-outlined text-base ${isRefining ? 'animate-spin' : ''}`}>
+                                {isRefining ? 'sync' : 'send'}
+                            </span>
+                            <span>{isRefining ? 'Mixing...' : 'Refine'}</span>
+                        </button>
+                    </form>
                 </div>
 
                 <div className="flex flex-col gap-2">

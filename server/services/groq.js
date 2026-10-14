@@ -272,3 +272,59 @@ export const extractMusicalKeywords = async (userPrompt) => {
         return { keywords: userPrompt, min_valence: null, max_valence: null, min_energy: null, max_energy: null };
     }
 };
+
+/**
+ * Interactive Conversational Playlist Refinement with AI Vibe DJ
+ */
+export const refinePlaylistWithAI = async (userInstruction, currentTracks = [], playlistName = "", playlistDescription = "") => {
+    console.log('[Groq] Refine Playlist Request:', userInstruction);
+
+    const trackSummary = currentTracks.map((t, idx) => ({
+        index: idx + 1,
+        id: t.id,
+        name: t.name,
+        artist: t.artist || t.artists?.[0]?.name || 'Unknown'
+    }));
+
+    const systemPrompt = `You are VibeMixer's expert AI DJ assistant. 
+The user has an existing playlist and wants to tweak, add, remove, or modify tracks based on natural language instructions.
+You must carefully execute the user's request:
+- If asked to remove songs (by name, index, or vibe like 'remove slow songs'), omit them.
+- If asked to add songs or replace songs (e.g. 'add 3 high energy songs', 'add Arijit Singh', 'make it more rock'), add real, well-known, high quality songs that fit the requested style.
+- Maintain musical cohesion.
+- Respond with JSON ONLY in this format:
+{
+  "assistantReply": "Friendly, stylish DJ confirmation explaining exactly what was changed (1-2 sentences).",
+  "updatedTracks": [
+    {
+      "id": "original-id-or-new-unique-id",
+      "name": "Track Title",
+      "artist": "Artist Name",
+      "reason": "Why this track fits the vibe",
+      "isNew": true // true if this is a newly added/replaced track, false if kept from original playlist
+    }
+  ]
+}`;
+
+    const userPrompt = `Existing Playlist: "${playlistName}" (${playlistDescription})
+Current Tracklist:
+${JSON.stringify(trackSummary, null, 2)}
+
+User Instruction: "${userInstruction}"
+
+Refine the tracklist now:`;
+
+    try {
+        const completion = await callGroqWithFallback([
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+        ], DEFAULT_MODEL, 0.6, true);
+
+        const content = completion.choices[0]?.message?.content;
+        return JSON.parse(content);
+    } catch (error) {
+        console.error('[Groq] Playlist refinement error:', error);
+        throw error;
+    }
+};
+

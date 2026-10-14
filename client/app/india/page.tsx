@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import IndiaMap from "@/components/IndiaMap";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Header } from "@/components/Header";
 
 export default function IndiaVibePage() {
     const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
@@ -86,20 +87,7 @@ export default function IndiaVibePage() {
 
     return (
         <div className="min-h-screen flex flex-col bg-background-light dark:bg-background-dark text-foreground transition-colors duration-300">
-            {/* Header */}
-            <header className="flex items-center p-4 justify-between sticky top-0 z-10 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm border-b border-border">
-                <Link
-                    href="/"
-                    className="flex items-center justify-center size-10 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                >
-                    <span className="material-symbols-outlined text-2xl">home</span>
-                </Link>
-                <div className="flex items-center gap-2">
-                    <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" />
-                    <h1 className="text-xl font-bold">Indian Vibe Map</h1>
-                </div>
-                <ThemeToggle />
-            </header>
+            <Header />
 
             <main className="flex-1 flex flex-col md:flex-row p-4 gap-6 max-w-7xl mx-auto w-full h-[calc(100vh-80px)]">
                 {/* Map Section */}

@@ -235,6 +235,7 @@ export default function GeneratePage() {
                         onChange={(e) => setModel(e.target.value)}
                         value={model}
                         className="w-full bg-surface-dark text-white rounded-lg p-3 border border-white/10 focus:border-primary focus:outline-none"
+                    >
                         <option value="qwen/qwen3.8-27b">Qwen 3.8 27B (High Accuracy - Fast)</option>
                         <option value="openai/gpt-oss-120b">GPT-OSS 120B (Deep Music Knowledge)</option>
                         <option value="openai/gpt-oss-20b">GPT-OSS 20B (Ultra Fast)</option>

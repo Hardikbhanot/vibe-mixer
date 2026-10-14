@@ -34,12 +34,14 @@ export const initSpotifyApi = async (req, res, next) => {
 
             // Update Cookie
             const isProduction = process.env.NODE_ENV === 'production';
+            const domain = isProduction ? '.vibemixer.hbhanot.tech' : undefined;
             res.cookie('spotify_access_token', newAccessToken, {
                 httpOnly: true,
                 secure: isProduction ? true : false,
                 maxAge: expiresIn * 1000,
                 path: '/',
-                sameSite: isProduction ? 'none' : 'lax'
+                sameSite: isProduction ? 'none' : 'lax',
+                domain: domain
             });
 
             console.log('[Auth Middleware] Token refreshed successfully');

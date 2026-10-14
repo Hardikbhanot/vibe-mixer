@@ -15,8 +15,10 @@ const spotifyApi = new SpotifyWebApi({
 const scopes = [
     'user-read-private',
     'user-read-email',
+    'user-top-read',
     'playlist-modify-public',
     'playlist-modify-private',
+    'ugc-image-upload',
 ];
 
 import { PrismaClient } from '@prisma/client';
@@ -224,9 +226,13 @@ router.get('/me', async (req, res) => {
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
-        const user = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { id: true, email: true } });
+        const user = await prisma.user.findUnique({
+            where: { id: decoded.userId },
+            select: { id: true, email: true, username: true, avatarUrl: true }
+        });
         if (!user) return res.status(401).json({ error: 'User not found' });
-        res.json({ user });
+        const hasSpotify = !!(req.cookies.spotify_access_token || req.cookies.spotify_refresh_token);
+        res.json({ user: { ...user, hasSpotify } });
     } catch (err) {
         res.status(401).json({ error: 'Invalid token' });
     }
@@ -248,9 +254,10 @@ router.get('/login', (req, res) => {
     console.log('[Spotify Auth] /login called.');
     console.log('[Spotify Auth] Query Params:', req.query);
     const platform = req.query.platform || 'web';
-    console.log(`[Spotify Auth] Initiating for Platform: ${platform}`);
+    const next = req.query.next || req.query.redirect || null;
+    console.log(`[Spotify Auth] Initiating for Platform: ${platform}, Next: ${next}`);
 
-    const state = Buffer.from(JSON.stringify({ platform })).toString('base64');
+    const state = Buffer.from(JSON.stringify({ platform, next })).toString('base64');
     console.log('[Spotify Auth] Generated State:', state);
 
     const authorizeURL = spotifyApi.createAuthorizeURL(scopes, state);
@@ -390,6 +397,12 @@ router.get('/callback', async (req, res) => {
                     console.log('[Spotify Auth] Redirecting to Mobile App Scheme (vibemixer://)...');
                     const mobileRedirectUrl = `vibemixer://auth-callback?spotify_access_token=${access_token}&spotify_refresh_token=${refresh_token}`;
                     return res.redirect(mobileRedirectUrl);
+                }
+
+                if (stateData.next) {
+                    const target = stateData.next.startsWith('/') ? stateData.next : `/${stateData.next}`;
+                    console.log(`[Spotify Auth] Preserving user flow: redirecting back to ${clientUrl}${target}`);
+                    return res.redirect(`${clientUrl}${target}`);
                 }
             } catch (e) {
                 console.error('[Spotify Auth] Failed to parse state:', e, 'Raw:', req.query.state);

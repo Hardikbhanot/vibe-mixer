@@ -58,12 +58,20 @@ app.use('/api/match', matchRoutes);
 // app.use('/api/admin', adminRoutes); // Removed (Using Dev-Mode Seeder)
 app.use('/api/messages', messageRoutes);
 
+import http from "http";
+import { initWebSocket } from './services/websocket.js';
+
 app.get("/", (req, res) => {
   res.send("Backend is running!");
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const server = http.createServer(app);
+
+// Mount Real-Time WebSockets
+initWebSocket(server);
+
+server.listen(PORT, () => {
+  console.log(`Server with WebSockets running on port ${PORT}`);
 
   // Start Background Seeder (Auto-runs on deploy)
   // Now uses Gemini (AI) so it's safe for Cloud IPs

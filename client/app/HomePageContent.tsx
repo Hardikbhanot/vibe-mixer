@@ -25,8 +25,9 @@ import {
     ExternalLink
 } from "lucide-react";
 import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 
-// --- Preset Demo Vibes for the Interactive Hero Sandbox ---
+// --- Preset Demo Vibes with Curated Top Playlists and Songs ---
 const DEMO_VIBES = [
     {
         id: "tokyo",
@@ -34,11 +35,93 @@ const DEMO_VIBES = [
         prompt: "Neon-lit highways in Tokyo, synthwave bassline, high energy driving through rain",
         title: "Neon Expressway",
         artist: "Kavinsky • The Midnight • Gunship",
+        playlistName: "Tokyo Midnight Drive • 128 BPM Synthwave",
+        playlistDescription: "High-octane retrowave & driving synth basslines for cruising neon metropolitan expressways under midnight rain.",
         bpm: 128,
         valence: "68% (Euphoric)",
         energy: "89% (High Drive)",
         ragMatch: "99.4%",
-        color: "from-fuchsia-500 to-cyan-500"
+        color: "from-fuchsia-500 to-cyan-500",
+        tracks: [
+            {
+                id: "tokyo_1",
+                name: "Nightcall",
+                artist: "Kavinsky",
+                artists: [{ name: "Kavinsky" }],
+                album: { name: "OutRun", images: [{ url: "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=500&h=500&fit=crop" }] },
+                duration_ms: 259000,
+                uri: "spotify:search:Nightcall Kavinsky",
+                external_urls: { spotify: "https://open.spotify.com/search/Nightcall%20Kavinsky", youtube: "https://www.youtube.com/results?search_query=Nightcall+Kavinsky" },
+                ai_reason: "Iconic cinematic synth bassline with robotic vocoder harmonies that define night driving.",
+                confidence_score: 99,
+                match_type: "RAG Vector Match"
+            },
+            {
+                id: "tokyo_2",
+                name: "Sunset",
+                artist: "The Midnight",
+                artists: [{ name: "The Midnight" }],
+                album: { name: "Endless Summer", images: [{ url: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&h=500&fit=crop" }] },
+                duration_ms: 326000,
+                uri: "spotify:search:Sunset The Midnight",
+                external_urls: { spotify: "https://open.spotify.com/search/Sunset%20The%20Midnight", youtube: "https://www.youtube.com/results?search_query=Sunset+The+Midnight" },
+                ai_reason: "Euphoric saxophone solos over surging 80s analog synth arpeggios.",
+                confidence_score: 98,
+                match_type: "Harmonic Cohesion"
+            },
+            {
+                id: "tokyo_3",
+                name: "Tech Noir",
+                artist: "Gunship",
+                artists: [{ name: "Gunship" }],
+                album: { name: "GUNSHIP", images: [{ url: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&h=500&fit=crop" }] },
+                duration_ms: 297000,
+                uri: "spotify:search:Tech Noir Gunship",
+                external_urls: { spotify: "https://open.spotify.com/search/Tech%20Noir%20Gunship", youtube: "https://www.youtube.com/results?search_query=Tech+Noir+Gunship" },
+                ai_reason: "Moody retro-futuristic atmosphere inspired by cyberpunk noir films.",
+                confidence_score: 97,
+                match_type: "RAG Vector Match"
+            },
+            {
+                id: "tokyo_4",
+                name: "Resonance",
+                artist: "HOME",
+                artists: [{ name: "HOME" }],
+                album: { name: "Odyssey", images: [{ url: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&h=500&fit=crop" }] },
+                duration_ms: 212000,
+                uri: "spotify:search:Resonance HOME",
+                external_urls: { spotify: "https://open.spotify.com/search/Resonance%20HOME", youtube: "https://www.youtube.com/results?search_query=Resonance+HOME" },
+                ai_reason: "The quintessential internet nostalgia anthem with gliding polyphonic synth pads.",
+                confidence_score: 99,
+                match_type: "RAG Vector Match"
+            },
+            {
+                id: "tokyo_5",
+                name: "Memory Reboot",
+                artist: "VØJ, Narvent",
+                artists: [{ name: "VØJ" }, { name: "Narvent" }],
+                album: { name: "Memory Reboot", images: [{ url: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=500&h=500&fit=crop" }] },
+                duration_ms: 198000,
+                uri: "spotify:search:Memory Reboot VOJ Narvent",
+                external_urls: { spotify: "https://open.spotify.com/search/Memory%20Reboot", youtube: "https://www.youtube.com/results?search_query=Memory+Reboot" },
+                ai_reason: "Dark cinematic wave with heavy pulsing bass for cruising through Tokyo rain.",
+                confidence_score: 98,
+                match_type: "RAG Vector Match"
+            },
+            {
+                id: "tokyo_6",
+                name: "Days of Thunder",
+                artist: "The Midnight",
+                artists: [{ name: "The Midnight" }],
+                album: { name: "Days of Thunder", images: [{ url: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&h=500&fit=crop" }] },
+                duration_ms: 329000,
+                uri: "spotify:search:Days of Thunder The Midnight",
+                external_urls: { spotify: "https://open.spotify.com/search/Days%20of%20Thunder", youtube: "https://www.youtube.com/results?search_query=Days+of+Thunder" },
+                ai_reason: "Thunderous 80s gated snare drums and triumphant retro lead synths.",
+                confidence_score: 96,
+                match_type: "Harmonic Cohesion"
+            }
+        ]
     },
     {
         id: "coffee",
@@ -46,11 +129,80 @@ const DEMO_VIBES = [
         prompt: "Warm coffee shop in Kyoto, soft rhodes piano, vinyl crackle, cozy raindrops",
         title: "Kyoto Petrichor",
         artist: "Kowloon • idealism • Tomppabeats",
+        playlistName: "Rainy Sunday Lo-Fi • Cozy Chillhop",
+        playlistDescription: "Warm rhodes pianos, soft vinyl crackle, and nostalgic tape saturation for slow rainy afternoons.",
         bpm: 78,
         valence: "54% (Melancholic Peace)",
         energy: "32% (Deep Focus)",
         ragMatch: "98.7%",
-        color: "from-amber-400 to-rose-400"
+        color: "from-amber-400 to-rose-400",
+        tracks: [
+            {
+                id: "lofi_1",
+                name: "nagashi",
+                artist: "idealism",
+                artists: [{ name: "idealism" }],
+                album: { name: "rainy day memories", images: [{ url: "https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=500&h=500&fit=crop" }] },
+                duration_ms: 165000,
+                uri: "spotify:search:nagashi idealism",
+                external_urls: { spotify: "https://open.spotify.com/search/nagashi%20idealism", youtube: "https://www.youtube.com/results?search_query=nagashi+idealism" },
+                ai_reason: "Tender acoustic piano loops washed in authentic tape flutter and rain field recordings.",
+                confidence_score: 99,
+                match_type: "RAG Vector Match"
+            },
+            {
+                id: "lofi_2",
+                name: "Snowman",
+                artist: "WYS",
+                artists: [{ name: "WYS" }],
+                album: { name: "1 AM. Study Session", images: [{ url: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=500&h=500&fit=crop" }] },
+                duration_ms: 180000,
+                uri: "spotify:search:Snowman WYS",
+                external_urls: { spotify: "https://open.spotify.com/search/Snowman%20WYS", youtube: "https://www.youtube.com/results?search_query=Snowman+WYS" },
+                ai_reason: "Soft Rhodes chords with crisp lofi hip-hop drums designed for deep flow states.",
+                confidence_score: 98,
+                match_type: "Harmonic Cohesion"
+            },
+            {
+                id: "lofi_3",
+                name: "Affection",
+                artist: "Jinsang",
+                artists: [{ name: "Jinsang" }],
+                album: { name: "Life", images: [{ url: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&h=500&fit=crop" }] },
+                duration_ms: 154000,
+                uri: "spotify:search:Affection Jinsang",
+                external_urls: { spotify: "https://open.spotify.com/search/Affection%20Jinsang", youtube: "https://www.youtube.com/results?search_query=Affection+Jinsang" },
+                ai_reason: "Golden era SP-404 vinyl swing with warm jazz saxophone samples.",
+                confidence_score: 97,
+                match_type: "RAG Vector Match"
+            },
+            {
+                id: "lofi_4",
+                name: "Monday Loop",
+                artist: "Tomppabeats",
+                artists: [{ name: "Tomppabeats" }],
+                album: { name: "Harbor", images: [{ url: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=500&h=500&fit=crop" }] },
+                duration_ms: 122000,
+                uri: "spotify:search:Monday Loop Tomppabeats",
+                external_urls: { spotify: "https://open.spotify.com/search/Monday%20Loop%20Tomppabeats", youtube: "https://www.youtube.com/results?search_query=Monday+Loop+Tomppabeats" },
+                ai_reason: "Short, poignant jazz chords and warm bass for a contemplative rainy Sunday.",
+                confidence_score: 96,
+                match_type: "Harmonic Cohesion"
+            },
+            {
+                id: "lofi_5",
+                name: "Raindrops",
+                artist: "Kupla",
+                artists: [{ name: "Kupla" }],
+                album: { name: "Kingdom in Blue", images: [{ url: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=500&h=500&fit=crop" }] },
+                duration_ms: 174000,
+                uri: "spotify:search:Raindrops Kupla",
+                external_urls: { spotify: "https://open.spotify.com/search/Raindrops%20Kupla", youtube: "https://www.youtube.com/results?search_query=Raindrops+Kupla" },
+                ai_reason: "Airy flute melodies combined with soothing acoustic guitar strums.",
+                confidence_score: 98,
+                match_type: "RAG Vector Match"
+            }
+        ]
     },
     {
         id: "cyberpunk",
@@ -58,11 +210,80 @@ const DEMO_VIBES = [
         prompt: "Underground high-tech gym, dark industrial phonk, heavy distorted 808s",
         title: "Overclocked Pulse",
         artist: "Kordhell • DVRST • Pharmacist",
+        playlistName: "Cyberpunk Workout • 142 BPM Dark Phonk",
+        playlistDescription: "Distorted 808 cowbells, industrial aggression, and relentless mechanical rhythm for crushing PRs.",
         bpm: 142,
         valence: "40% (Aggressive Focus)",
         energy: "98% (Peak Overdrive)",
         ragMatch: "99.8%",
-        color: "from-purple-500 to-emerald-400"
+        color: "from-purple-500 to-emerald-400",
+        tracks: [
+            {
+                id: "cyber_1",
+                name: "Murder In My Mind",
+                artist: "KORDHELL",
+                artists: [{ name: "KORDHELL" }],
+                album: { name: "Murder In My Mind", images: [{ url: "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=500&h=500&fit=crop" }] },
+                duration_ms: 145000,
+                uri: "spotify:search:Murder In My Mind KORDHELL",
+                external_urls: { spotify: "https://open.spotify.com/search/Murder%20In%20My%20Mind%20KORDHELL", youtube: "https://www.youtube.com/results?search_query=Murder+In+My+Mind+KORDHELL" },
+                ai_reason: "Maximum velocity drift phonk with distorted Memphis vocal chops and wall-shaking bass.",
+                confidence_score: 99,
+                match_type: "RAG Vector Match"
+            },
+            {
+                id: "cyber_2",
+                name: "Close Eyes",
+                artist: "DVRST",
+                artists: [{ name: "DVRST" }],
+                album: { name: "Close Eyes", images: [{ url: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&h=500&fit=crop" }] },
+                duration_ms: 132000,
+                uri: "spotify:search:Close Eyes DVRST",
+                external_urls: { spotify: "https://open.spotify.com/search/Close%20Eyes%20DVRST", youtube: "https://www.youtube.com/results?search_query=Close+Eyes+DVRST" },
+                ai_reason: "Hypnotic driving cowbell rhythm that locks your mental focus into high-intensity reps.",
+                confidence_score: 98,
+                match_type: "Harmonic Cohesion"
+            },
+            {
+                id: "cyber_3",
+                name: "North Memphis",
+                artist: "Pharmacist",
+                artists: [{ name: "Pharmacist" }],
+                album: { name: "North Memphis", images: [{ url: "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=500&h=500&fit=crop" }] },
+                duration_ms: 148000,
+                uri: "spotify:search:North Memphis Pharmacist",
+                external_urls: { spotify: "https://open.spotify.com/search/North%20Memphis%20Pharmacist", youtube: "https://www.youtube.com/results?search_query=North+Memphis+Pharmacist" },
+                ai_reason: "Pure aggressive adrenaline with rapid hi-hat rolls and clipping 808 kicks.",
+                confidence_score: 99,
+                match_type: "RAG Vector Match"
+            },
+            {
+                id: "cyber_4",
+                name: "Metamorphosis",
+                artist: "INTERWORLD",
+                artists: [{ name: "INTERWORLD" }],
+                album: { name: "Metamorphosis", images: [{ url: "https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=500&h=500&fit=crop" }] },
+                duration_ms: 143000,
+                uri: "spotify:search:Metamorphosis INTERWORLD",
+                external_urls: { spotify: "https://open.spotify.com/search/Metamorphosis%20INTERWORLD", youtube: "https://www.youtube.com/results?search_query=Metamorphosis+INTERWORLD" },
+                ai_reason: "Dark electronic synthesizer leads driving past 140 BPM with unrelenting force.",
+                confidence_score: 97,
+                match_type: "Harmonic Cohesion"
+            },
+            {
+                id: "cyber_5",
+                name: "Warning",
+                artist: "MC ORSEN",
+                artists: [{ name: "MC ORSEN" }],
+                album: { name: "WARNING", images: [{ url: "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=500&h=500&fit=crop" }] },
+                duration_ms: 156000,
+                uri: "spotify:search:Warning MC ORSEN",
+                external_urls: { spotify: "https://open.spotify.com/search/Warning%20MC%20ORSEN", youtube: "https://www.youtube.com/results?search_query=Warning+MC+ORSEN" },
+                ai_reason: "High-impact percussive assault engineered for heavyweight lifting.",
+                confidence_score: 98,
+                match_type: "RAG Vector Match"
+            }
+        ]
     },
     {
         id: "sunset",
@@ -70,18 +291,101 @@ const DEMO_VIBES = [
         prompt: "Ibiza beach club sunset, organic afro house, warm melodic percussion, gentle sea breeze",
         title: "Balearic Horizon",
         artist: "Keinemusik • Black Coffee • Rampa",
+        playlistName: "Mediterranean Sunset • Melodic Afro House",
+        playlistDescription: "Ibiza golden hour grooves, lush polyrhythmic percussion, and euphoric balearic synths.",
         bpm: 122,
         valence: "86% (Pure Warmth)",
         energy: "74% (Smooth Groove)",
         ragMatch: "97.9%",
-        color: "from-orange-400 to-pink-500"
+        color: "from-orange-400 to-pink-500",
+        tracks: [
+            {
+                id: "sunset_1",
+                name: "Move",
+                artist: "Adam Port, Stryv, Malachiii",
+                artists: [{ name: "Adam Port" }, { name: "Stryv" }, { name: "Keinemusik" }],
+                album: { name: "Move", images: [{ url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500&h=500&fit=crop" }] },
+                duration_ms: 178000,
+                uri: "spotify:search:Move Adam Port Stryv",
+                external_urls: { spotify: "https://open.spotify.com/search/Move%20Adam%20Port", youtube: "https://www.youtube.com/results?search_query=Move+Adam+Port" },
+                ai_reason: "The definitive global summer anthem with sun-drenched afro-house chords and uplifting vocals.",
+                confidence_score: 99,
+                match_type: "RAG Vector Match"
+            },
+            {
+                id: "sunset_2",
+                name: "Drive",
+                artist: "Black Coffee, David Guetta, Delilah Montagu",
+                artists: [{ name: "Black Coffee" }, { name: "David Guetta" }],
+                album: { name: "Drive", images: [{ url: "https://images.unsplash.com/photo-1519046904884-53103b34b206?w=500&h=500&fit=crop" }] },
+                duration_ms: 251000,
+                uri: "spotify:search:Drive Black Coffee",
+                external_urls: { spotify: "https://open.spotify.com/search/Drive%20Black%20Coffee", youtube: "https://www.youtube.com/results?search_query=Drive+Black+Coffee" },
+                ai_reason: "Deep organic basslines paired with soulful emotive vocals for golden hour transition.",
+                confidence_score: 98,
+                match_type: "Harmonic Cohesion"
+            },
+            {
+                id: "sunset_3",
+                name: "Say What",
+                artist: "Keinemusik, &ME, Rampa, Chuala",
+                artists: [{ name: "Keinemusik" }, { name: "&ME" }, { name: "Rampa" }],
+                album: { name: "Say What", images: [{ url: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=500&h=500&fit=crop" }] },
+                duration_ms: 362000,
+                uri: "spotify:search:Say What Keinemusik",
+                external_urls: { spotify: "https://open.spotify.com/search/Say%20What%20Keinemusik", youtube: "https://www.youtube.com/results?search_query=Say+What+Keinemusik" },
+                ai_reason: "Polyrhythmic congas and rolling bass groove quintessential to the Kloud Ibiza experience.",
+                confidence_score: 97,
+                match_type: "RAG Vector Match"
+            },
+            {
+                id: "sunset_4",
+                name: "Mwaki",
+                artist: "Zerb, Sofiya Nzau",
+                artists: [{ name: "Zerb" }, { name: "Sofiya Nzau" }],
+                album: { name: "Mwaki", images: [{ url: "https://images.unsplash.com/photo-1473496169904-658ba7c44d8a?w=500&h=500&fit=crop" }] },
+                duration_ms: 208000,
+                uri: "spotify:search:Mwaki Zerb",
+                external_urls: { spotify: "https://open.spotify.com/search/Mwaki%20Zerb", youtube: "https://www.youtube.com/results?search_query=Mwaki+Zerb" },
+                ai_reason: "Hypnotic Kikuyu tribal vocal chant over crisp progressive house percussion.",
+                confidence_score: 99,
+                match_type: "RAG Vector Match"
+            },
+            {
+                id: "sunset_5",
+                name: "Les Gout",
+                artist: "Rampa, Chuala",
+                artists: [{ name: "Rampa" }],
+                album: { name: "Les Gout", images: [{ url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500&h=500&fit=crop" }] },
+                duration_ms: 344000,
+                uri: "spotify:search:Les Gout Rampa",
+                external_urls: { spotify: "https://open.spotify.com/search/Les%20Gout%20Rampa", youtube: "https://www.youtube.com/results?search_query=Les+Gout+Rampa" },
+                ai_reason: "Warm analog synthesizer textures that build into an emotional sunset crescendo.",
+                confidence_score: 98,
+                match_type: "Harmonic Cohesion"
+            }
+        ]
     }
 ];
 
 export default function HomePageContent({ jsonLd }: { jsonLd: any }) {
+    const router = useRouter();
     const containerRef = useRef<HTMLDivElement>(null);
     const [activeDemo, setActiveDemo] = useState(DEMO_VIBES[0]);
     const [isPlaying, setIsPlaying] = useState(true);
+
+    const handleLaunchDemoMix = () => {
+        if (!activeDemo.tracks) return;
+        const fullPlaylist = {
+            playlist_name: activeDemo.playlistName || activeDemo.title,
+            playlist_description: activeDemo.playlistDescription || activeDemo.prompt,
+            cover_art_description: activeDemo.prompt,
+            total_duration_mins: Math.round(activeDemo.tracks.reduce((acc: number, t: any) => acc + (t.duration_ms || 210000), 0) / 60000),
+            tracks: activeDemo.tracks
+        };
+        localStorage.setItem('playlistData', JSON.stringify(fullPlaylist));
+        router.push('/results');
+    };
 
     const { scrollYProgress } = useScroll({
         target: containerRef,
@@ -281,12 +585,13 @@ export default function HomePageContent({ jsonLd }: { jsonLd: any }) {
 
                                 {/* Right: Launch Button */}
                                 <div className="md:col-span-3 flex flex-col gap-2">
-                                    <Link href="/generate" className="w-full">
-                                        <button className="w-full py-3 px-4 bg-white text-black hover:bg-white/90 font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg flex items-center justify-center gap-2">
-                                            Generate Full Mix
-                                            <ArrowRight size={14} />
-                                        </button>
-                                    </Link>
+                                    <button
+                                        onClick={handleLaunchDemoMix}
+                                        className="w-full py-3.5 px-4 bg-gradient-to-r from-white via-purple-100 to-white text-black hover:opacity-95 font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-purple-500/20 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 group cursor-pointer"
+                                    >
+                                        <span>Generate Full Mix</span>
+                                        <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                                    </button>
                                     <div className="flex items-center justify-center gap-3 text-[11px] text-white/50 pt-1">
                                         <span className="flex items-center gap-1 text-[#1DB954]">
                                             <span className="w-1.5 h-1.5 rounded-full bg-[#1DB954]" /> Spotify Ready

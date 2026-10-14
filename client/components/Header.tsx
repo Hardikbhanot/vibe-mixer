@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '@/context/AuthContext';
 import { usePathname, useRouter } from 'next/navigation';
-import { Sparkles, ArrowLeft, Menu, X, Disc3 } from 'lucide-react';
+import { Sparkles, ArrowLeft, Menu, X, Disc3, MessageSquare } from 'lucide-react';
 
 export const Header = () => {
     const { user, loading } = useAuth();
@@ -21,6 +21,7 @@ export const Header = () => {
     const navLinks = [
         { href: '/generate', label: 'Studio', badge: 'AI' },
         { href: '/swipe', label: 'Taste Deck' },
+        { href: '/messages', label: 'Messages' },
         { href: '/discover', label: 'Community' },
         { href: '/match', label: 'Vibe Match' },
         { href: '/india', label: 'Radar' },
@@ -92,17 +93,30 @@ export const Header = () => {
 
                     {!loading && !isAuthPage && (
                         user ? (
-                            <Link href="/profile" className="relative group">
-                                <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-cyan-400 p-[1.5px] transition-transform group-hover:scale-105 shadow-md">
-                                    <div className="w-full h-full rounded-full bg-[#070709] flex items-center justify-center overflow-hidden">
-                                        {user.avatarUrl ? (
-                                            <img src={user.avatarUrl} alt={user.username || 'User'} className="w-full h-full object-cover" />
-                                        ) : (
-                                            <span className="font-bold text-xs text-white uppercase">{user.email?.[0] || 'U'}</span>
-                                        )}
+                            <div className="flex items-center gap-2.5">
+                                <Link
+                                    href="/messages"
+                                    className={`size-9 rounded-xl flex items-center justify-center transition-colors border ${
+                                        pathname === '/messages'
+                                            ? 'bg-purple-600/30 border-purple-500/50 text-purple-300'
+                                            : 'bg-white/[0.04] border-white/[0.08] hover:bg-white/[0.08] text-white/70 hover:text-white'
+                                    }`}
+                                    title="Messages"
+                                >
+                                    <MessageSquare size={17} />
+                                </Link>
+                                <Link href="/profile" className="relative group">
+                                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-cyan-400 p-[1.5px] transition-transform group-hover:scale-105 shadow-md">
+                                        <div className="w-full h-full rounded-full bg-[#070709] flex items-center justify-center overflow-hidden">
+                                            {user.avatarUrl ? (
+                                                <img src={user.avatarUrl} alt={user.username || 'User'} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className="font-bold text-xs text-white uppercase">{user.email?.[0] || 'U'}</span>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            </Link>
+                                </Link>
+                            </div>
                         ) : (
                             <div className="flex items-center gap-2">
                                 <Link href="/auth" className="hidden sm:block">
