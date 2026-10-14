@@ -11,6 +11,7 @@ import html2canvas from "html2canvas";
 // --- Types ---
 interface Track {
     id: string;
+    videoId?: string;
     name: string;
     artists?: { name: string }[];
     artist?: string;
@@ -21,7 +22,7 @@ interface Track {
     image?: string;
     uri: string;
     duration_ms: number;
-    external_urls: { spotify: string };
+    external_urls?: { spotify?: string; youtube?: string };
     ai_reason?: string;
     confidence_score?: number;
     match_type?: string;
@@ -281,6 +282,10 @@ function ResultsContent() {
     };
 
     const getTrackYoutubeUrl = (t: Track) => {
+        if (t.videoId) return `https://www.youtube.com/watch?v=${t.videoId}`;
+        if (t.external_urls?.youtube && !t.external_urls.youtube.includes('undefined')) {
+            return t.external_urls.youtube;
+        }
         const artist = t.artist || t.artists?.[0]?.name || '';
         return `https://www.youtube.com/results?search_query=${encodeURIComponent(t.name + ' ' + artist)}`;
     };
@@ -313,16 +318,27 @@ function ResultsContent() {
                 return;
             }
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || 'Failed to create Spotify playlist');
+            const result = await response.json().catch(() => ({}));
+
+            if (!response.ok || result.needsFallback || result.trackCount === 0) {
+                console.warn("[Save to Spotify] Fallback required:", result.error || "0 tracks resolved");
+                toast.error(
+                    result.message || result.error || "Spotify API requires developer Premium to add tracks. Switching to Tier 2 (YouTube)...",
+                    {
+                        duration: 8000,
+                        action: {
+                            label: 'Save to YouTube 🎬',
+                            onClick: () => handleSaveToYoutube()
+                        }
+                    }
+                );
+                return;
             }
 
-            const result = await response.json();
             setIsSavedToSpotify(true);
             const playlistUrl = result.playlistUrl || result.external_urls?.spotify || (result.id ? `https://open.spotify.com/playlist/${result.id}` : null);
             setSpotifyPlaylistUrl(playlistUrl);
-            toast.success('Spotify Playlist created successfully! 🎧');
+            toast.success(`Spotify Playlist created with ${result.trackCount} tracks! 🎧`);
             if (playlistUrl) {
                 window.open(playlistUrl, '_blank');
             }

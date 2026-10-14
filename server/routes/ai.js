@@ -3,7 +3,7 @@ import { generatePlaylistParams, analyzeImage, generateVibeAnalysis, extractMusi
 import { generateImage } from '../services/imagen.js';
 import { generateEmbedding } from '../services/embedding.js';
 import { initSpotifyApi } from '../middleware/spotifyAuth.js';
-import { searchYouTube } from '../services/youtube.js';
+import { searchYouTube, scrapeYouTubeVideoId } from '../services/youtube.js';
 import { authenticateToken } from '../middleware/auth.js';
 import multer from 'multer';
 import { PrismaClient } from '@prisma/client';
@@ -222,8 +222,17 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
 
                     // A. Instant Local Cache Hit with Artwork (0ms external latency)
                     if (localTrack && localTrack.coverImage) {
+                        const videoId = await scrapeYouTubeVideoId(`${cleanTitle} ${suggestion.artist} Official Audio`);
+                        const spotifyTrackUrl = localTrack.spotifyUri && /^spotify:track:[0-9A-Za-z]{22}$/.test(localTrack.spotifyUri)
+                            ? `https://open.spotify.com/track/${localTrack.spotifyUri.replace('spotify:track:', '')}`
+                            : `https://open.spotify.com/search/${encodeURIComponent(localTrack.title + ' ' + localTrack.artist)}`;
+                        const youtubeTrackUrl = videoId
+                            ? `https://www.youtube.com/watch?v=${videoId}`
+                            : `https://www.youtube.com/results?search_query=${encodeURIComponent(localTrack.title + ' ' + localTrack.artist)}`;
+
                         return {
                             id: localTrack.spotifyId || localTrack.id,
+                            videoId: videoId || null,
                             name: localTrack.title,
                             artists: [{ name: localTrack.artist }],
                             album: {
@@ -231,6 +240,10 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
                                 images: [{ url: localTrack.coverImage, height: 600, width: 600 }]
                             },
                             uri: localTrack.spotifyUri || `spotify:search:${encodeURIComponent(localTrack.title + ' ' + localTrack.artist)}`,
+                            external_urls: {
+                                spotify: spotifyTrackUrl,
+                                youtube: youtubeTrackUrl
+                            },
                             preview_url: localTrack.previewUrl,
                             duration_ms: localTrack.durationMs || 210000,
                             ai_reason: suggestion.reason || "Fits the harmonic vibe perfectly.",
@@ -256,8 +269,17 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
                             }).catch(() => {});
                         }
 
+                        const videoId = await scrapeYouTubeVideoId(`${cleanTitle} ${suggestion.artist} Official Audio`);
+                        const spotifyTrackUrl = localTrack?.spotifyUri && /^spotify:track:[0-9A-Za-z]{22}$/.test(localTrack.spotifyUri)
+                            ? `https://open.spotify.com/track/${localTrack.spotifyUri.replace('spotify:track:', '')}`
+                            : `https://open.spotify.com/search/${encodeURIComponent(suggestion.song + ' ' + suggestion.artist)}`;
+                        const youtubeTrackUrl = videoId
+                            ? `https://www.youtube.com/watch?v=${videoId}`
+                            : `https://www.youtube.com/results?search_query=${encodeURIComponent(suggestion.song + ' ' + suggestion.artist)}`;
+
                         return {
                             id: localTrack?.spotifyId || `itunes_${cleanTitle.toLowerCase().replace(/\s+/g, '_')}`,
+                            videoId: videoId || null,
                             name: localTrack?.title || suggestion.song,
                             artists: [{ name: localTrack?.artist || suggestion.artist }],
                             album: {
@@ -265,6 +287,10 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
                                 images: [{ url: itunesMeta.coverImage, height: 600, width: 600 }]
                             },
                             uri: localTrack?.spotifyUri || `spotify:search:${encodeURIComponent(suggestion.song + ' ' + suggestion.artist)}`,
+                            external_urls: {
+                                spotify: spotifyTrackUrl,
+                                youtube: youtubeTrackUrl
+                            },
                             preview_url: itunesMeta.previewUrl,
                             duration_ms: itunesMeta.durationMs || 210000,
                             ai_reason: suggestion.reason || "Fits the harmonic vibe perfectly.",

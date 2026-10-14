@@ -1,5 +1,6 @@
 import express from 'express';
 import { initSpotifyApi } from '../middleware/spotifyAuth.js';
+import prisma from '../lib/prisma.js';
 
 const router = express.Router();
 
@@ -40,17 +41,8 @@ router.post('/playlist', initSpotifyApi, async (req, res) => {
 
     // Define the operation to allow retry
     const performPlaylistCreation = async () => {
-        // 1. Create Playlist on User Account
-        const playlistName = (name || 'VibeMixer Playlist').trim();
-        console.log(`[Spotify Route] Creating playlist "${playlistName}"...`);
-        const createData = await req.spotifyApi.createPlaylist(playlistName, {
-            description: 'Curated with VibeMixer AI Vibe DJ',
-            public: false
-        });
-        const playlistId = createData.body.id;
-        console.log(`[Spotify Route] Playlist created with ID: ${playlistId}`);
-
-        // 2. Resolve & Strictly Sanitize Track URIs
+        // 1. Resolve & Strictly Sanitize Track URIs FIRST
+        // This ensures we NEVER create an empty playlist container if tracks cannot be resolved!
         const resolvedUris = [];
         const seenUris = new Set();
 
@@ -79,7 +71,40 @@ router.post('/playlist', initSpotifyApi, async (req, res) => {
                 continue;
             }
 
-            // C. Search URI or Track Metadata fallback
+            // C. Database Knowledge Lookup (Instant Local RAG)
+            if (trackName) {
+                try {
+                    const cleanTitle = trackName.split('(')[0].split('-')[0].trim();
+                    const dbTrack = await prisma.trackKnowledge.findFirst({
+                        where: {
+                            title: { equals: cleanTitle, mode: 'insensitive' },
+                            ...(artistName ? { artist: { contains: artistName.split(',')[0].trim(), mode: 'insensitive' } } : {})
+                        },
+                        select: { spotifyUri: true, spotifyId: true }
+                    });
+
+                    if (dbTrack?.spotifyUri && /^spotify:track:[0-9A-Za-z]{22}$/.test(dbTrack.spotifyUri)) {
+                        if (!seenUris.has(dbTrack.spotifyUri)) {
+                            seenUris.add(dbTrack.spotifyUri);
+                            resolvedUris.push(dbTrack.spotifyUri);
+                        }
+                        continue;
+                    }
+
+                    if (dbTrack?.spotifyId && /^[0-9A-Za-z]{22}$/.test(dbTrack.spotifyId)) {
+                        const dbUri = `spotify:track:${dbTrack.spotifyId}`;
+                        if (!seenUris.has(dbUri)) {
+                            seenUris.add(dbUri);
+                            resolvedUris.push(dbUri);
+                        }
+                        continue;
+                    }
+                } catch (dbErr) {
+                    // Non-blocking
+                }
+            }
+
+            // D. Search URI or Track Metadata fallback (Uses User/App Spotify Token)
             let searchQuery = '';
             if (typeof uri === 'string' && uri.startsWith('spotify:search:')) {
                 searchQuery = decodeURIComponent(uri.replace('spotify:search:', '')).trim();
@@ -103,17 +128,36 @@ router.post('/playlist', initSpotifyApi, async (req, res) => {
             }
         }
 
-        console.log(`[Spotify Route] Resolved ${resolvedUris.length} authentic Spotify tracks.`);
+        console.log(`[Spotify Route] Resolved ${resolvedUris.length} of ${trackItems.length} authentic Spotify tracks.`);
+
+        // Critical Safeguard: If NO tracks could be resolved, DO NOT create an empty playlist!
+        if (resolvedUris.length === 0) {
+            const fallbackErr = new Error(
+                'Spotify Web API requires developer app owner Premium to resolve tracks via search. No valid Spotify track URIs could be resolved.'
+            );
+            fallbackErr.statusCode = 422;
+            fallbackErr.needsFallback = true;
+            fallbackErr.fallback = 'youtube';
+            throw fallbackErr;
+        }
+
+        // 2. Create Playlist on User Account ONLY when tracks exist
+        const playlistName = (name || 'VibeMixer Playlist').trim();
+        console.log(`[Spotify Route] Creating playlist "${playlistName}"...`);
+        const createData = await req.spotifyApi.createPlaylist(playlistName, {
+            description: 'Curated with VibeMixer AI Vibe DJ',
+            public: false
+        });
+        const playlistId = createData.body.id;
+        console.log(`[Spotify Route] Playlist created with ID: ${playlistId}`);
 
         // 3. Add Tracks in Chunks of 50 (Spotify limit is 100 per call)
-        if (resolvedUris.length > 0) {
-            const chunkSize = 50;
-            for (let i = 0; i < resolvedUris.length; i += chunkSize) {
-                const chunk = resolvedUris.slice(i, i + chunkSize);
-                await req.spotifyApi.addTracksToPlaylist(playlistId, chunk);
-            }
-            console.log(`[Spotify Route] Added ${resolvedUris.length} tracks to playlist.`);
+        const chunkSize = 50;
+        for (let i = 0; i < resolvedUris.length; i += chunkSize) {
+            const chunk = resolvedUris.slice(i, i + chunkSize);
+            await req.spotifyApi.addTracksToPlaylist(playlistId, chunk);
         }
+        console.log(`[Spotify Route] Added ${resolvedUris.length} tracks to playlist.`);
 
         // 4. Safely Upload Cover Image (Optional Enhancement, Never Blocks)
         if (coverImageUrl && typeof coverImageUrl === 'string') {
@@ -160,6 +204,17 @@ router.post('/playlist', initSpotifyApi, async (req, res) => {
         const result = await performPlaylistCreation();
         res.json(result);
     } catch (error) {
+        // Check for 422 Unprocessable Entity (Needs Fallback)
+        if (error.statusCode === 422 || error.needsFallback) {
+            return res.status(422).json({
+                error: error.message,
+                needsFallback: true,
+                fallback: 'youtube',
+                message: 'Spotify API requires developer Premium to resolve search tracks. Seamlessly switching to YouTube (Tier 2)...',
+                trackCount: 0
+            });
+        }
+
         // Check for 401 Unauthorized
         const isAuthError = error.statusCode === 401 || (error.body && error.body.error && error.body.error.status === 401);
 
@@ -169,7 +224,7 @@ router.post('/playlist', initSpotifyApi, async (req, res) => {
                 // Attempt to refresh the token using the middleware helper
                 if (req.refreshSpotifyToken) {
                     await req.refreshSpotifyToken();
-                    // Retry operation with new token (req.spotifyApi is updated inv-place)
+                    // Retry operation with new token (req.spotifyApi is updated in-place)
                     const result = await performPlaylistCreation();
                     return res.json(result);
                 } else {

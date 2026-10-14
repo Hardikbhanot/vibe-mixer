@@ -26,14 +26,16 @@ export default function GeneratePage() {
             return;
         }
 
-        // Safeguard: If user was redirected here following an auth flow with a pending export or recently generated mix, return to /results
+        // Safeguard: If user was redirected here following an auth flow with a pending export or active playlist, return to /results
         const pendingSpotify = localStorage.getItem('pendingSpotifySave');
         const pendingYoutube = localStorage.getItem('pendingYoutubeSave');
         const hasPlaylist = localStorage.getItem('playlistData');
+        const params = new URLSearchParams(window.location.search);
+        const hasAuthConnection = params.has('spotify_connected') || params.has('google_connected');
 
-        if ((pendingSpotify || pendingYoutube) && hasPlaylist) {
-            console.log('[GeneratePage] Pending export detected after auth flow. Returning to /results...');
-            router.replace('/results');
+        if (((pendingSpotify || pendingYoutube) || hasAuthConnection) && hasPlaylist) {
+            console.log('[GeneratePage] Active playlist with auth state detected. Returning to /results...');
+            router.replace('/results' + window.location.search);
             return;
         }
 

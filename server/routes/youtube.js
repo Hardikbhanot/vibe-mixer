@@ -1,7 +1,7 @@
 import express from 'express';
 import { google } from 'googleapis';
 import { getRegionalVibeQuery } from '../services/groq.js';
-import { rotator, searchYouTube } from '../services/youtube.js';
+import { rotator, searchYouTube, scrapeYouTubeVideoId } from '../services/youtube.js';
 
 const router = express.Router();
 
@@ -65,9 +65,72 @@ router.post('/playlist', initYoutubeClient, async (req, res) => {
     }
 
     try {
-        // 1. Create Playlist (Use 'private' for unverified OAuth apps)
+        // 1. Resolve Video IDs FIRST to guarantee no empty playlists are created
+        const videoIds = [];
+        for (const track of tracks) {
+            try {
+                // Check if track already has a videoId
+                let videoId = track.videoId;
+                if (!videoId && track.external_urls?.youtube) {
+                    const match = track.external_urls.youtube.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+                    if (match) videoId = match[1];
+                }
+
+                if (videoId) {
+                    videoIds.push(videoId);
+                    continue;
+                }
+
+                const artistName = track.artist || track.artists?.[0]?.name || '';
+                const query = `${track.name || ''} ${artistName} Official Audio`.trim();
+
+                let foundId = null;
+
+                // Priority A: Zero-quota high-speed scraper (<200ms, unlimited)
+                try {
+                    foundId = await scrapeYouTubeVideoId(query);
+                } catch (sErr) {
+                    // Fallthrough to API
+                }
+
+                // Priority B: User Google OAuth Search (if scraper returned null)
+                if (!foundId) {
+                    try {
+                        const searchRes = await req.youtube.search.list({
+                            part: ['snippet'],
+                            q: query,
+                            maxResults: 1,
+                            type: ['video'],
+                        });
+
+                        if (searchRes.data.items && searchRes.data.items.length > 0) {
+                            foundId = searchRes.data.items[0].id.videoId;
+                        }
+                    } catch (userSearchErr) {
+                        console.warn(`[YouTube Route] User search quota exhausted for "${track.name}", using rotator:`, userSearchErr.message);
+                        const fallbackTrack = await searchYouTube(query);
+                        if (fallbackTrack && fallbackTrack.id) {
+                            foundId = fallbackTrack.id;
+                        }
+                    }
+                }
+
+                if (foundId) videoIds.push(foundId);
+            } catch (err) {
+                console.warn(`[YouTube Route] Failed to find video for "${track.name}":`, err.message);
+            }
+        }
+
+        if (videoIds.length === 0) {
+            return res.status(422).json({
+                error: 'Could not resolve playable videos for the given tracks. Playlist creation aborted to avoid empty playlist.',
+                videoCount: 0
+            });
+        }
+
+        // 2. Create Playlist on User's YouTube Channel (Use 'private' for unverified OAuth apps)
         const playlistTitle = (name || 'My VibeMixer Playlist').trim();
-        console.log(`[YouTube Route] Creating playlist: "${playlistTitle}"`);
+        console.log(`[YouTube Route] Creating playlist: "${playlistTitle}" for ${videoIds.length} videos`);
         let playlistRes;
         try {
             playlistRes = await req.youtube.playlists.insert({
@@ -100,51 +163,6 @@ router.post('/playlist', initYoutubeClient, async (req, res) => {
 
         const playlistId = playlistRes.data.id;
         console.log(`[YouTube Route] Playlist created: ${playlistId}`);
-
-        // 2. Search and Add Videos
-        const videoIds = [];
-        for (const track of tracks) {
-            try {
-                // Check if track already has a videoId
-                let videoId = track.videoId;
-                if (!videoId && track.external_urls?.youtube) {
-                    const match = track.external_urls.youtube.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-                    if (match) videoId = match[1];
-                }
-
-                if (videoId) {
-                    videoIds.push(videoId);
-                    continue;
-                }
-
-                const artistName = track.artist || track.artists?.[0]?.name || '';
-                const query = `${track.name || ''} ${artistName} Official Audio`.trim();
-
-                let foundId = null;
-                try {
-                    const searchRes = await req.youtube.search.list({
-                        part: ['snippet'],
-                        q: query,
-                        maxResults: 1,
-                        type: ['video'],
-                    });
-
-                    if (searchRes.data.items && searchRes.data.items.length > 0) {
-                        foundId = searchRes.data.items[0].id.videoId;
-                    }
-                } catch (userSearchErr) {
-                    console.warn(`[YouTube Route] User search quota exhausted for "${track.name}", using rotator:`, userSearchErr.message);
-                    const fallbackTrack = await searchYouTube(query);
-                    if (fallbackTrack && fallbackTrack.id) {
-                        foundId = fallbackTrack.id;
-                    }
-                }
-
-                if (foundId) videoIds.push(foundId);
-            } catch (err) {
-                console.warn(`[YouTube Route] Failed to find video for "${track.name}":`, err.message);
-            }
-        }
 
         console.log(`[YouTube Route] Adding ${videoIds.length} videos to playlist ${playlistId}...`);
 
