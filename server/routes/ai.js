@@ -397,6 +397,8 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
 
         res.json({
             ...aiParams,
+            playlist_name: aiParams.playlist_name || aiParams.name || aiParams.playlistName || `${mood.slice(0, 30)} Mix`,
+            playlist_description: aiParams.playlist_description || aiParams.description || aiParams.playlistDescription || `Curated sonic blend crafted for "${mood}"`,
             tracks: finalTracks,
             total_duration_mins: Math.round(currentDurationMs / 60000),
             isGuest: req.isGuest
@@ -449,7 +451,7 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
 });
 
 // --- 4. Refine Playlist Route (Swipe History) ---
-router.post('/refine', authenticateToken, initSpotifyApi, async (req, res) => {
+router.post('/refine-history', authenticateToken, initSpotifyApi, async (req, res) => {
     try {
         const userId = req.user.userId;
 
@@ -684,6 +686,8 @@ router.post('/refine', async (req, res) => {
         res.json({
             success: true,
             assistantReply: result.assistantReply || "I've refined your playlist with your requested changes!",
+            playlist_name: result.playlistName || playlistName || "My Vibe Mix",
+            playlist_description: result.playlistDescription || playlistDescription || "Refined by AI Vibe DJ",
             tracks: finalTracks
         });
 

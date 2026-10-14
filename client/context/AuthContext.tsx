@@ -47,7 +47,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (res.ok) {
         setUser(data.user);
-        router.push('/generate');
+        const nextParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('next') : null;
+        if (nextParam) {
+          router.push(nextParam);
+        } else {
+          router.push('/generate');
+        }
         return { success: true };
       } else {
         return { success: false, error: data.error };

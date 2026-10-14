@@ -232,7 +232,8 @@ router.get('/me', async (req, res) => {
         });
         if (!user) return res.status(401).json({ error: 'User not found' });
         const hasSpotify = !!(req.cookies.spotify_access_token || req.cookies.spotify_refresh_token);
-        res.json({ user: { ...user, hasSpotify } });
+        const hasGoogle = !!(req.cookies.google_access_token || req.cookies.google_refresh_token);
+        res.json({ user: { ...user, hasSpotify, hasGoogle } });
     } catch (err) {
         res.status(401).json({ error: 'Invalid token' });
     }
@@ -255,9 +256,13 @@ router.get('/login', (req, res) => {
     console.log('[Spotify Auth] Query Params:', req.query);
     const platform = req.query.platform || 'web';
     const next = req.query.next || req.query.redirect || null;
-    console.log(`[Spotify Auth] Initiating for Platform: ${platform}, Next: ${next}`);
+    let origin = req.query.origin || null;
+    if (!origin && req.headers.referer) {
+        try { origin = new URL(req.headers.referer).origin; } catch (e) {}
+    }
+    console.log(`[Spotify Auth] Initiating for Platform: ${platform}, Next: ${next}, Origin: ${origin}`);
 
-    const state = Buffer.from(JSON.stringify({ platform, next })).toString('base64');
+    const state = Buffer.from(JSON.stringify({ platform, next, origin })).toString('base64');
     console.log('[Spotify Auth] Generated State:', state);
 
     const authorizeURL = spotifyApi.createAuthorizeURL(scopes, state);
@@ -399,6 +404,10 @@ router.get('/callback', async (req, res) => {
                     return res.redirect(mobileRedirectUrl);
                 }
 
+                if (stateData.origin && (stateData.origin.includes('localhost') || stateData.origin.includes('vibemixer') || stateData.origin.includes('127.0.0.1'))) {
+                    clientUrl = stateData.origin;
+                }
+
                 if (stateData.next) {
                     const target = stateData.next.startsWith('/') ? stateData.next : `/${stateData.next}`;
                     console.log(`[Spotify Auth] Preserving user flow: redirecting back to ${clientUrl}${target}`);
@@ -443,7 +452,12 @@ router.get('/google', (req, res) => {
     ];
 
     const platform = req.query.platform || 'web';
-    const state = Buffer.from(JSON.stringify({ platform })).toString('base64');
+    const next = req.query.next || req.query.redirect || null;
+    let origin = req.query.origin || null;
+    if (!origin && req.headers.referer) {
+        try { origin = new URL(req.headers.referer).origin; } catch (e) {}
+    }
+    const state = Buffer.from(JSON.stringify({ platform, next, origin })).toString('base64');
 
     const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes.join(' '))}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
 
@@ -565,6 +579,17 @@ router.get('/google/callback', async (req, res) => {
                     console.log('[Google Auth] Redirecting to Mobile App Scheme (vibemixer://)...');
                     const mobileRedirectUrl = `vibemixer://auth-callback?google_access_token=${access_token}&google_refresh_token=${refresh_token || ''}`;
                     return res.redirect(mobileRedirectUrl);
+                }
+
+                let clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+                if (stateData.origin && (stateData.origin.includes('localhost') || stateData.origin.includes('vibemixer') || stateData.origin.includes('127.0.0.1'))) {
+                    clientUrl = stateData.origin;
+                }
+
+                if (stateData.next) {
+                    const target = stateData.next.startsWith('/') ? stateData.next : `/${stateData.next}`;
+                    console.log(`[Google Auth] Preserving user flow: redirecting back to ${clientUrl}${target}`);
+                    return res.redirect(`${clientUrl}${target}`);
                 }
             } catch (e) {
                 console.error('[Google Auth] Failed to parse state:', e, 'Raw State:', req.query.state);

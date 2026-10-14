@@ -58,6 +58,7 @@ function ResultsContent() {
     // Dynamic Save & Export States
     const [isSavedToLibrary, setIsSavedToLibrary] = useState(false);
     const [isSavingLibrary, setIsSavingLibrary] = useState(false);
+    const [isJustSaved, setIsJustSaved] = useState(false);
     const [isSavedToSpotify, setIsSavedToSpotify] = useState(false);
     const [spotifyPlaylistUrl, setSpotifyPlaylistUrl] = useState<string | null>(null);
     const [isSavedToYoutube, setIsSavedToYoutube] = useState(false);
@@ -96,16 +97,34 @@ function ResultsContent() {
         if (googleConnected) {
             window.history.replaceState({}, '', '/results');
         }
+
+        // Auto-resume pending exports after OAuth redirect
+        const pendingSpotify = localStorage.getItem('pendingSpotifySave');
+        if (pendingSpotify && storedData) {
+            localStorage.removeItem('pendingSpotifySave');
+            setTimeout(() => {
+                handleSaveToSpotify();
+            }, 800);
+        }
+
+        const pendingYoutube = localStorage.getItem('pendingYoutubeSave');
+        if (pendingYoutube && storedData) {
+            localStorage.removeItem('pendingYoutubeSave');
+            setTimeout(() => {
+                handleSaveToYoutube();
+            }, 800);
+        }
     }, [searchParams]);
 
     const generateCoverImage = async (prompt: string) => {
         setIsGeneratingImage(true);
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+            const cleanPrompt = `modern aesthetic vinyl album cover art, abstract 3d geometric visual art, ${prompt}, strictly no human faces, no portraits, no people`;
             const response = await fetch(`${apiUrl}/ai/image`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt }),
+                body: JSON.stringify({ prompt: cleanPrompt }),
             });
             const result = await response.json();
             if (result.imageUrl) {
@@ -115,7 +134,7 @@ function ResultsContent() {
             }
         } catch (error) {
             console.error('Failed to generate image:', error);
-            toast.error('AI generation failed. Using fallback cover.');
+            setCoverImage('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1024&h=1024&fit=crop');
         } finally {
             setIsGeneratingImage(false);
         }
@@ -187,8 +206,8 @@ function ResultsContent() {
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({
-                    name: data.playlist_name,
-                    description: data.playlist_description,
+                    name: data.playlist_name || (data as any).name || 'My Vibe Mix',
+                    description: data.playlist_description || (data as any).description || 'Curated with VibeMixer',
                     coverImage: coverImage,
                     mood: "Mix",
                     tracks: data.tracks.map((t: any) => ({
@@ -206,12 +225,14 @@ function ResultsContent() {
 
             if (response.ok) {
                 setIsSavedToLibrary(true);
+                setIsJustSaved(true);
+                setTimeout(() => setIsJustSaved(false), 900);
                 toast.success("Saved to your profile library! 📚");
             } else if (response.status === 401) {
                 toast.error("Please login to save to library");
                 router.push('/auth?next=/results');
             } else {
-                toast.error("Failed to save.");
+                toast.error("Failed to save to profile library.");
             }
         } catch (e) {
             console.error(e);
@@ -246,44 +267,59 @@ function ResultsContent() {
         setIsSaving(true);
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
         try {
-            const finalCoverImage = coverImage || 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=512&h=512&fit=crop';
+            const finalCoverImage = coverImage || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=512&h=512&fit=crop';
 
             const response = await fetch(`${apiUrl}/spotify/playlist`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    name: data.playlist_name,
+                    name: data.playlist_name || (data as any).name || 'My Vibe Mix',
+                    description: data.playlist_description || (data as any).description || 'Curated with VibeMixer AI',
                     trackUris: data.tracks.map(t => t.uri),
+                    tracks: data.tracks,
                     coverImageUrl: finalCoverImage
                 }),
                 credentials: 'include'
             });
 
             if (response.status === 401) {
-                toast.error("Spotify not connected. Redirecting to Spotify login...");
-                window.location.href = `${apiUrl}/auth/login?next=/results`;
+                localStorage.setItem('pendingSpotifySave', 'true');
+                toast.info("Connecting to Spotify to save your playlist...");
+                const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+                window.location.href = `${apiUrl}/auth/login?next=/results&origin=${encodeURIComponent(currentOrigin)}`;
                 return;
             }
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || 'Failed to create playlist');
+                throw new Error(errorData.error || 'Failed to create Spotify playlist');
             }
 
             const result = await response.json();
             setIsSavedToSpotify(true);
-            const playlistUrl = result.external_urls?.spotify || (result.id ? `https://open.spotify.com/playlist/${result.id}` : null);
+            const playlistUrl = result.playlistUrl || result.external_urls?.spotify || (result.id ? `https://open.spotify.com/playlist/${result.id}` : null);
             setSpotifyPlaylistUrl(playlistUrl);
             toast.success('Spotify Playlist created successfully! 🎧');
             if (playlistUrl) {
                 window.open(playlistUrl, '_blank');
             }
         } catch (error: any) {
-            console.error('Error saving playlist:', error);
-            toast.error(error.message || 'Failed to save playlist. Check Spotify login.');
+            console.error('Error saving playlist to Spotify:', error);
+            toast.error(error.message || 'Spotify save encountered an issue. Try YouTube fallback!', {
+                action: {
+                    label: 'Try YouTube',
+                    onClick: () => handleSaveToYoutube()
+                }
+            });
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const openInstantYoutubeMix = () => {
+        if (!data || !data.tracks.length) return;
+        const query = encodeURIComponent(`${data.playlist_name || (data as any).name || 'Mix'} ${data.tracks[0]?.name || ''}`);
+        window.open(`https://music.youtube.com/search?q=${query}`, '_blank');
     };
 
     const handleSaveToYoutube = async () => {
@@ -295,8 +331,8 @@ function ResultsContent() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    name: data.playlist_name,
-                    description: data.playlist_description,
+                    name: data.playlist_name || (data as any).name || 'My Vibe Mix',
+                    description: data.playlist_description || (data as any).description || 'Generated by VibeMixer AI',
                     tracks: data.tracks,
                     coverImage: coverImage
                 }),
@@ -304,21 +340,35 @@ function ResultsContent() {
             });
 
             if (response.status === 401) {
-                window.location.href = `${apiUrl}/auth/google`;
+                localStorage.setItem('pendingYoutubeSave', 'true');
+                const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+                toast.info("Connecting to Google to export YouTube playlist...", {
+                    action: {
+                        label: 'Open Instant Mix',
+                        onClick: () => openInstantYoutubeMix()
+                    }
+                });
+                window.location.href = `${apiUrl}/auth/google?next=/results&origin=${encodeURIComponent(currentOrigin)}`;
                 return;
             }
-            if (!response.ok) throw new Error('Failed to create playlist');
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || 'Failed to create YouTube playlist');
+            }
 
             const result = await response.json();
             setIsSavedToYoutube(true);
-            setYoutubePlaylistUrl(result.playlistUrl || null);
+            const playlistUrl = result.playlistUrl || (result.playlistId ? `https://www.youtube.com/playlist?list=${result.playlistId}` : null);
+            setYoutubePlaylistUrl(playlistUrl);
             toast.success('YouTube Playlist created successfully! 🎬');
-            if (result.playlistUrl) {
-                window.open(result.playlistUrl, '_blank');
+            if (playlistUrl) {
+                window.open(playlistUrl, '_blank');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving to YouTube:', error);
-            toast.error('Failed to save playlist to YouTube.');
+            toast.error(error.message || 'YouTube save failed. Opening instant mix...');
+            openInstantYoutubeMix();
         } finally {
             setIsSavingYoutube(false);
         }
@@ -343,8 +393,8 @@ function ResultsContent() {
                 body: JSON.stringify({
                     instruction: text,
                     currentTracks: data.tracks,
-                    playlistName: data.playlist_name,
-                    playlistDescription: data.playlist_description
+                    playlistName: data.playlist_name || (data as any).name || 'My Vibe Mix',
+                    playlistDescription: data.playlist_description || (data as any).description || 'Curated with AI Vibe DJ'
                 }),
                 credentials: 'include'
             });
@@ -359,6 +409,8 @@ function ResultsContent() {
             if (resData.tracks && Array.isArray(resData.tracks)) {
                 const updatedPlaylist = {
                     ...data,
+                    playlist_name: resData.playlist_name || data.playlist_name || (data as any).name || "My Vibe Mix",
+                    playlist_description: resData.playlist_description || data.playlist_description || (data as any).description || "Refined by AI Vibe DJ",
                     tracks: resData.tracks,
                     total_duration_mins: Math.round(resData.tracks.reduce((acc: number, t: any) => acc + (t.duration_ms || 210000), 0) / 60000)
                 };
@@ -397,7 +449,8 @@ function ResultsContent() {
         );
     }
 
-    const displayImage = coverImage || (data ? `https://image.pollinations.ai/prompt/${encodeURIComponent(data.cover_art_description || data.playlist_name)}?width=512&height=512&nologo=true` : '');
+    const cleanArtPrompt = `modern aesthetic vinyl album cover art, graphic design typography, abstract 3d textures, vibrant neon geometric visual art, ${data.cover_art_description || data.playlist_name || 'music mix'}, strictly no human faces, no portraits, no people`;
+    const displayImage = coverImage || (data ? `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanArtPrompt)}?width=512&height=512&nologo=true&model=flux&enhance=true` : '');
 
     const handlePlayTrack = (track: Track) => {
         const platform = localStorage.getItem('musicPlatform');
@@ -426,6 +479,8 @@ function ResultsContent() {
         setShowPlatformModal(false);
         setSelectedTrackForPlay(null);
     };
+
+    const isSpotifyConnected = Boolean(user && user.hasSpotify);
 
     return (
         <div className="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden antialiased">
@@ -469,15 +524,19 @@ function ResultsContent() {
 
                     <div className="flex flex-col text-center md:text-left flex-1 gap-4">
                         <div>
-                            <h2 className="text-foreground tracking-light text-[32px] font-bold leading-tight">{data.playlist_name}</h2>
-                            <p className="text-foreground/70 text-base mt-2">{data.playlist_description}</p>
-                            <p className="text-muted-foreground text-sm mt-1">{data.tracks.length} Tracks • {data.total_duration_mins || Math.round(data.tracks.reduce((acc, t) => acc + t.duration_ms, 0) / 60000)} mins</p>
+                            <h2 className="text-foreground tracking-light text-[32px] font-bold leading-tight">
+                                {data.playlist_name || (data as any).name || (data as any).playlistName || (data as any).title || "My Vibe Mix"}
+                            </h2>
+                            <p className="text-foreground/70 text-base mt-2">
+                                {data.playlist_description || (data as any).description || (data as any).playlistDescription || "AI-curated sonic blend crafted to match your exact vibe."}
+                            </p>
+                            <p className="text-muted-foreground text-sm mt-1">{data.tracks.length} Tracks • {data.total_duration_mins || Math.round(data.tracks.reduce((acc, t) => acc + (t.duration_ms || 210000), 0) / 60000)} mins</p>
                         </div>
                         {/* Aligned 2-Tier Streaming Exports & Actions Toolbar */}
                         <div className="flex flex-col gap-3 w-full">
                             {/* Primary Streaming Exports (2-Tier: Spotify 1st, YouTube 2nd) */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full">
-                                {user?.hasSpotify !== false ? (
+                                {isSpotifyConnected ? (
                                     <button
                                         onClick={handleSaveToSpotify}
                                         disabled={isSaving}
@@ -505,10 +564,12 @@ function ResultsContent() {
                                 ) : (
                                     <button
                                         onClick={() => {
+                                            localStorage.setItem('pendingSpotifySave', 'true');
                                             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
-                                            window.location.href = `${apiUrl}/auth/login?next=/results`;
+                                            const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+                                            window.location.href = `${apiUrl}/auth/login?next=/results&origin=${encodeURIComponent(currentOrigin)}`;
                                         }}
-                                        className="flex items-center justify-center gap-2 h-11 px-5 rounded-xl bg-transparent border-2 border-[#1DB954] text-[#1DB954] font-bold text-sm hover:bg-[#1DB954] hover:text-white transition-all duration-300"
+                                        className="flex items-center justify-center gap-2 h-11 px-5 rounded-xl bg-transparent border-2 border-[#1DB954] text-[#1DB954] font-bold text-sm hover:bg-[#1DB954] hover:text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                                     >
                                         <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_Green.png" alt="Spotify" className="h-5 w-auto" />
                                         <span>Connect Spotify to Save</span>
@@ -543,7 +604,7 @@ function ResultsContent() {
 
                             {/* Secondary Actions Toolbar: Save (Library), Public/Private, Story, Why? */}
                             <div className="flex flex-wrap items-center gap-2 w-full">
-                                {/* Save to Library Button (Filled Icon & Animated on Save) */}
+                                {/* Save to Library Button (Filled Icon & Animated once on Save) */}
                                 <button
                                     onClick={handleSaveToLibrary}
                                     disabled={isSavingLibrary}
@@ -556,8 +617,8 @@ function ResultsContent() {
                                 >
                                     <span
                                         className={`material-symbols-outlined text-xl transition-all duration-300 ${
-                                            isSavedToLibrary ? 'scale-125 text-amber-400 animate-bounce' : ''
-                                        }`}
+                                            isSavedToLibrary ? 'text-amber-400 scale-110' : ''
+                                        } ${isJustSaved ? 'animate-bounce' : ''}`}
                                         style={isSavedToLibrary ? { fontVariationSettings: "'FILL' 1" } : undefined}
                                     >
                                         bookmark

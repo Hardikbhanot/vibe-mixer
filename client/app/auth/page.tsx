@@ -253,7 +253,11 @@ export default function AuthPage() {
                         <div className="grid grid-cols-2 gap-4">
                             <button
                                 onClick={() => {
-                                    window.location.href = `/auth/login`; // Spotify via Proxy
+                                    const nextParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('next') : null;
+                                    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+                                    const query = nextParam ? `?next=${encodeURIComponent(nextParam)}&origin=${encodeURIComponent(currentOrigin)}` : `?origin=${encodeURIComponent(currentOrigin)}`;
+                                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+                                    window.location.href = `${apiUrl}/auth/login${query}`;
                                 }}
                                 className="flex items-center justify-center gap-2 py-3 bg-[#1DB954]/10 hover:bg-[#1DB954]/20 text-[#1DB954] font-bold rounded-xl transition-colors"
                             >
@@ -261,7 +265,11 @@ export default function AuthPage() {
                             </button>
                             <button
                                 onClick={() => {
-                                    window.location.href = `/auth/google`; // Google via Proxy
+                                    const nextParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('next') : null;
+                                    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+                                    const query = nextParam ? `?next=${encodeURIComponent(nextParam)}&origin=${encodeURIComponent(currentOrigin)}` : `?origin=${encodeURIComponent(currentOrigin)}`;
+                                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+                                    window.location.href = `${apiUrl}/auth/google${query}`;
                                 }}
                                 className="flex items-center justify-center gap-2 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold rounded-xl transition-colors"
                             >

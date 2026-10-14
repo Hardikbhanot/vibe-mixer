@@ -4,9 +4,11 @@ export const generateImage = async (prompt) => {
     try {
         console.log('[Imagen] Generating cover art for:', prompt);
 
-        const cleanPrompt = encodeURIComponent(prompt.trim().slice(0, 500));
+        // Enforce abstract, aesthetic album cover art; strictly prohibit human faces and realistic portraits
+        const enrichedPrompt = `modern aesthetic vinyl album cover art, graphic design typography, abstract 3d textures, vibrant neon geometric visual art, ${prompt.trim().replace(/face|portrait|girl|woman|man|person|human/gi, '')}, strictly no human faces, no portraits, no people, no selfies`;
+        const cleanPrompt = encodeURIComponent(enrichedPrompt.slice(0, 480));
         // Use Flux model for better quality, ensure nologo
-        const url = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1024&height=1024&nologo=true&model=flux`;
+        const url = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1024&height=1024&nologo=true&model=flux&enhance=true`;
 
         console.log('[Imagen] Fetching from Pollinations (Flux)...');
 
@@ -29,10 +31,9 @@ export const generateImage = async (prompt) => {
 
     } catch (error) {
         console.error("[Imagen] Generation Failed:", error.message);
-        console.log("[Imagen] Falling back to Unsplash...");
+        console.log("[Imagen] Falling back to curated abstract vinyl art...");
 
-        // Fallback: Unsplash
-        const keywords = encodeURIComponent(prompt.split(' ').slice(0, 2).join(','));
-        return `https://source.unsplash.com/1600x1600/?${keywords},art`;
+        // Fallback: Aesthetic abstract artwork
+        return `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1024&h=1024&fit=crop`;
     }
 };

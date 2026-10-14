@@ -91,9 +91,9 @@ export const generatePlaylistParams = async (userPrompt, vibeType = 'mix', track
           "reason": "Short reason why this song fits the vibe."
         }
       ], 
-      "playlist_name": "Creative Playlist Name",
-      "playlist_description": "A short description of the vibe.",
-      "cover_art_description": "A vivid, artistic, and abstract description of a cover image that represents this vibe. Do not include text."
+      "playlist_name": "Creative, evocative, and punchy playlist title (required, never empty)",
+      "playlist_description": "A stylish, descriptive explanation of the playlist vibe.",
+      "cover_art_description": "Vivid artistic abstract album cover art description (e.g. surreal neon geometry, minimalist 3d shapes, retro synthwave gradients, futuristic textures). STRICT REQUIREMENT: strictly NO human faces, NO portraits, NO people, NO photos of individuals."
     }
     `;
 
@@ -106,7 +106,18 @@ export const generatePlaylistParams = async (userPrompt, vibeType = 'mix', track
         const content = completion.choices[0]?.message?.content;
         console.log('Groq Response Length:', content.length);
 
-        return JSON.parse(content);
+        const parsed = JSON.parse(content);
+        const playlist_name = (parsed.playlist_name || parsed.playlistName || parsed.name || parsed.title || `${userPrompt.slice(0, 30)} Mix`).trim();
+        const playlist_description = (parsed.playlist_description || parsed.playlistDescription || parsed.description || `Curated mix for "${userPrompt}"`).trim();
+        const cover_art_description = (parsed.cover_art_description || parsed.coverArtDescription || parsed.cover_art || `abstract aesthetic music album cover art for ${playlist_name}`).trim();
+
+        return {
+            ...parsed,
+            playlist_name,
+            playlist_description,
+            cover_art_description,
+            suggested_tracks: Array.isArray(parsed.suggested_tracks) ? parsed.suggested_tracks : []
+        };
     } catch (error) {
         console.error("Groq API Error:", error);
         throw error;
@@ -295,6 +306,8 @@ You must carefully execute the user's request:
 - Respond with JSON ONLY in this format:
 {
   "assistantReply": "Friendly, stylish DJ confirmation explaining exactly what was changed (1-2 sentences).",
+  "playlistName": "Updated Playlist Name (keep original unless requested or vibe changed significantly)",
+  "playlistDescription": "Updated Playlist Description",
   "updatedTracks": [
     {
       "id": "original-id-or-new-unique-id",
@@ -321,7 +334,13 @@ Refine the tracklist now:`;
         ], DEFAULT_MODEL, 0.6, true);
 
         const content = completion.choices[0]?.message?.content;
-        return JSON.parse(content);
+        const parsed = JSON.parse(content);
+        return {
+            assistantReply: parsed.assistantReply || "I've refined your playlist with your requested changes!",
+            playlistName: parsed.playlistName || playlistName || "My Vibe Mix",
+            playlistDescription: parsed.playlistDescription || playlistDescription || "Refined by AI DJ",
+            updatedTracks: Array.isArray(parsed.updatedTracks) ? parsed.updatedTracks : []
+        };
     } catch (error) {
         console.error('[Groq] Playlist refinement error:', error);
         throw error;
