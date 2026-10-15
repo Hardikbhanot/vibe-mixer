@@ -113,30 +113,40 @@ router.post('/playlist', initYoutubeClient, async (req, res) => {
             const artistName = track.artist || track.artists?.[0]?.name || '';
             const query = `${track.name || ''} ${artistName} Official Audio`.trim();
 
-            // Priority A: Zero-quota high-speed scraper (<200ms)
+            // Priority A: Zero-quota scraper with 10k view verification (<200ms)
             try {
-                const scrapedId = await scrapeYouTubeVideoId(query);
+                const scrapedId = await scrapeYouTubeVideoId(query, 10000);
                 if (scrapedId && /^[a-zA-Z0-9_-]{11}$/.test(scrapedId)) {
                     return scrapedId;
                 }
             } catch (sErr) {}
 
-            // Priority B: User Google OAuth Search
+            // Priority B: User Google OAuth Search with >=10k views check
             try {
                 const searchRes = await req.youtube.search.list({
                     part: ['snippet'],
                     q: query,
-                    maxResults: 1,
+                    maxResults: 3,
                     type: ['video'],
+                    order: 'viewCount'
                 });
-                const item = searchRes.data?.items?.[0];
-                if (item?.id?.videoId && /^[a-zA-Z0-9_-]{11}$/.test(item.id.videoId)) {
-                    return item.id.videoId;
+                const items = searchRes.data?.items || [];
+                const candidateIds = items.map(i => i.id?.videoId).filter(Boolean);
+
+                if (candidateIds.length > 0) {
+                    const statsRes = await req.youtube.videos.list({
+                        part: ['statistics'],
+                        id: candidateIds
+                    });
+                    const qualified = (statsRes.data?.items || []).find(v => parseInt(v.statistics?.viewCount || '0', 10) >= 10000);
+                    if (qualified?.id) {
+                        return qualified.id;
+                    }
                 }
             } catch (userSearchErr) {
                 // Priority C: Centralized Rotator API Keys
                 try {
-                    const fallbackTrack = await searchYouTube(query);
+                    const fallbackTrack = await searchYouTube(query, 0, 10000);
                     if (fallbackTrack?.id && /^[a-zA-Z0-9_-]{11}$/.test(fallbackTrack.id)) {
                         return fallbackTrack.id;
                     }

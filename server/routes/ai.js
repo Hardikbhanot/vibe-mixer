@@ -54,12 +54,15 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
         // Extract musical keywords AND vibe parameters
         const analysis = await extractMusicalKeywords(mood);
         const musicalKeywords = analysis.keywords;
+        const lyricalThemes = analysis.lyrical_themes || "";
         console.log(`[RAG] Optimized Query: "${musicalKeywords}"`);
+        if (lyricalThemes) console.log(`[RAG] Lyrical Themes: "${lyricalThemes}"`);
         console.log(`[RAG] Vibe Filters: Valence [${analysis.min_valence}-${analysis.max_valence}], Energy [${analysis.min_energy}-${analysis.max_energy}]`);
 
         try {
-            // Generate embedding for the OPTIMIZED keywords
-            vibeEmbedding = await generateEmbedding(musicalKeywords);
+            // Generate embedding for the OPTIMIZED keywords + lyrical themes
+            const embeddingQuery = lyricalThemes ? `${musicalKeywords}. Lyrical theme: ${lyricalThemes}` : musicalKeywords;
+            vibeEmbedding = await generateEmbedding(embeddingQuery);
             console.log('[RAG] Generated embedding for prompt.');
 
             // --- STEP 2: HYBRID RETRIEVAL (Semantic + Metadata) ---
@@ -124,8 +127,8 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
 
             // Format Lyric Matches
             if (lyricMatches.length > 0) {
-                const songs = lyricMatches.map(s => `- "${s.title}" by ${s.artist} (Lyrics match theme: "${s.lyrics.substring(0, 50)}...")`).join('\n');
-                similarPlaylistsContext += `\nLYRICAL THEME MATCHES (Include these if fit): \n${songs}\n`;
+                const songs = lyricMatches.map(s => `- "${s.title}" by ${s.artist} (Lyrical excerpt: "${s.lyrics.substring(0, 80).replace(/\s+/g, ' ')}...")`).join('\n');
+                similarPlaylistsContext += `\nAUTHENTIC LYRICAL MATCHES (From knowledge base matching these lyrical themes; incorporate these or similar songs with matching emotional depth, avoiding literal title puns): \n${songs}\n`;
                 console.log(`[RAG] Found ${lyricMatches.length} lyrical matches.`);
             }
 

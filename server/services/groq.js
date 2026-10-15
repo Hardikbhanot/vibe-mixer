@@ -75,7 +75,15 @@ export const generatePlaylistParams = async (userPrompt, vibeType = 'mix', track
     3. **Personalization**: ${tasteContext}
     4. **Language Diversity**: ACTIVELY INCLUDE songs from various languages and regions if they fit the vibe (e.g., Spanish, Korean, French, Hindi, etc.). Do not limit to English unless requested.
     5. **Tracklist**: Generate **${trackCount} specific songs** (Song Title + Artist) to ensure enough content for the requested duration.
-    6. **Reasoning**: For EACH song, provide a short, punchy 1-sentence reason why it fits this specific mood.
+    6. **Reasoning**: For EACH song, provide a short, punchy 1-sentence reason highlighting how its **lyrics, poetic sentiment, or acoustic texture** fits this mood.
+    7. **STRICT ANTI-LITERAL-TITLE BIAS (CRITICAL RULE)**:
+       - **NEVER** lazily pick songs just because words from the user prompt appear in the song title!
+       - FOR EXAMPLE: If the user asks for "rainy day songs", **DO NOT** pack the playlist with songs containing "Rain" or "Rainy" in their title (e.g. strictly avoid clichés like 'Rain on Me', 'Set Fire to the Rain', 'Purple Rain', 'Rainy Days and Mondays', 'Here Comes The Rain Again', 'It\'s Raining Men', etc.).
+       - At most **ONE OR TWO** songs in the entire tracklist may casually have the prompt word in their title. At least 90% of songs MUST NOT have the literal prompt keyword in their title!
+    8. **DEEP LYRICAL & ATMOSPHERIC MATCHING**:
+       - Instead of matching words in the song title, match the **UNDERLYING LYRICAL THEMES, EMOTIONAL NARRATIVE, AND SONIC TEXTURES**.
+       - For a "rainy day": select songs with lyrical themes of quiet introspection, cozy comfort, solitude, watching droplets on window glass, nostalgia, or contemplative coffee mornings. Feature rich textures like fingerpicked acoustic guitars, warm electric pianos, muted lo-fi drums, mellow jazz chords, and emotive storytelling vocals (e.g. artists like Bon Iver, Norah Jones, Cigarettes After Sex, Phoebe Bridgers, Billie Eilish, Joji, Mac DeMarco, Elliott Smith, Sufjan Stevens, Bruno Major, Anuv Jain, Prateek Kuhad, etc.).
+       - In the "reason" field for each song, EXPLICITLY explain its lyrical storytelling or acoustic texture (e.g., "Muted piano chords and reflective lyrics about quiet solitude perfectly mirror the calm, introspective mood of a rainstorm").
 
     Output MUST be a valid JSON object with the following structure:
     {
@@ -246,17 +254,26 @@ export const generateVibeAnalysis = async (topArtists, topTracks) => {
 export const extractMusicalKeywords = async (userPrompt) => {
     console.log('[Groq] Extracting musical keywords and vibe parameters...');
     const prompt = `
-    Analyze this user request for a music search.
-    1. Extract 5-10 musical search keywords (genre, mood, instrument, lyrical themes).
-    2. Determine target Audio Features ranges (Valence: 0.0-1.0, Energy: 0.0-1.0).
-       - Valence: Low (0.0-0.4) = Sad/Dark, High (0.6-1.0) = Happy/Positive
-       - Energy: Low (0.0-0.4) = Calm/Chill, High (0.6-1.0) = Intense/Fast/Party
-    
+    Analyze this user request for a music playlist.
+    Your task is to translate the user's prompt into deep acoustic, emotional, and lyrical concepts for semantic vector search across a 15,000+ song lyrics database.
+
+    CRITICAL RULES:
+    1. **NO LITERAL WORD COPYING**: Do NOT simply repeat words from the prompt.
+       - If user says "rainy day songs", DO NOT output "rain rainy day rainstorm".
+       - Unpack the underlying EMOTIONAL ATMOSPHERE, ACOUSTIC TEXTURES, and LYRICAL SENTIMENTS:
+         "introspective melancholic cozy acoustic guitar soft piano solitude nostalgia wistful longing warm gentle vocals lo-fi peaceful reflective yearning".
+       - If user says "gym workout", output: "relentless driving rhythm heavy bass motivating electronic trap adrenaline aggressive high tempo".
+       - If user says "late night drive", output: "nocturnal synth atmospheric reverb cinematic neon mellow highway dream pop bassline".
+    2. **Determine Target Audio Feature Ranges**:
+       - Valence (0.0-1.0): Low (0.0-0.35) = Sad/Melancholic/Moody, Medium (0.35-0.65) = Chill/Neutral, High (0.65-1.0) = Happy/Positive
+       - Energy (0.0-1.0): Low (0.0-0.35) = Calm/Acoustic/Ambient, Medium (0.35-0.65) = Mellow/Groovy, High (0.65-1.0) = Intense/Fast/Party
+
     User Request: "${userPrompt}"
-    
+
     Output JSON ONLY:
     {
-      "keywords": "string of keywords separated by spaces",
+      "keywords": "string of 8-12 rich descriptive mood, texture, and lyrical theme keywords separated by spaces (avoiding literal prompt words)",
+      "lyrical_themes": "1-sentence summary of the emotional narrative and lyrical feeling to search for in song lyrics",
       "min_valence": 0.0, // float or null if undefined
       "max_valence": 1.0, // float or null if undefined
       "min_energy": 0.0, // float or null if undefined
@@ -266,9 +283,9 @@ export const extractMusicalKeywords = async (userPrompt) => {
 
     try {
         const completion = await callGroqWithFallback([
-            { role: "system", content: "You are a music analysis bot. Output valid JSON only." },
+            { role: "system", content: "You are an expert musicologist and sonic semantic analyst. Output valid JSON only." },
             { role: "user", content: prompt },
-        ], DEFAULT_MODEL, 0.5, true); // JSON mode enabled
+        ], DEFAULT_MODEL, 0.4, true);
 
         const content = completion.choices[0]?.message?.content;
         console.log(`[Groq] Vibe Analysis: ${content}`);
@@ -280,7 +297,7 @@ export const extractMusicalKeywords = async (userPrompt) => {
         return result;
     } catch (error) {
         console.error("Keyword extraction failed:", error);
-        return { keywords: userPrompt, min_valence: null, max_valence: null, min_energy: null, max_energy: null };
+        return { keywords: userPrompt, lyrical_themes: userPrompt, min_valence: null, max_valence: null, min_energy: null, max_energy: null };
     }
 };
 

@@ -432,4 +432,31 @@ When continuing development on your personal laptop:
    - Specifically catches `403 Forbidden` responses and parses the underlying Spotify error payload.
    - Surfaces a helpful, human-readable message explaining the Spotify Developer whitelist requirement, and provides an immediate 1-click fallback button to **"Save to YouTube 🎬"** or save to profile library so playlists are never lost.
 
+---
+
+## 15. YouTube 10k Views Quality Filter & Anti-Literal Lyrical Matching
+
+### Problem Diagnosis
+1. **Low Quality / Obscure YouTube Video Matches**:
+   - When resolving YouTube audio or video tracks, naive searches sometimes matched obscure bedroom covers, fan re-uploads, or broken audio snippets with < 500 views rather than authentic official tracks.
+2. **Literal Title Bias on Prompt Generation**:
+   - When a user requested themed playlists like "rainy day songs", LLMs fell into the classic "literal title bias" trap, suggesting songs solely because they contain the word "rain" or "rainy" in their title (e.g., 'Rain on Me', 'Set Fire to the Rain', 'Purple Rain', 'Rainy Days and Mondays').
+   - This ruined immersion by ignoring the true emotional vibe, acoustic texture, and lyrical mood (cozy, introspective, melancholic, acoustic guitar, soft piano, lo-fi beats, gentle vocals).
+
+### Implementation Details:
+1. **YouTube >= 10,000 Views Verification Engine** ([`server/services/youtube.js`](file:///server/services/youtube.js), [`server/routes/youtube.js`](file:///server/routes/youtube.js)):
+   - Implemented `parseYouTubeViews` to parse view count strings (`"882,135,109 views"`, `"1.2M views"`, `"15K views"`, `"840 views"`).
+   - In `scrapeYouTubeVideoId`: Parses view counts directly from public search HTML renderer blocks and enforces `minViews = 10000`, filtering out low-view videos.
+   - In `searchYouTube` & `searchYouTubeMultiple`: Fetches top candidate batches and verifies `statistics.viewCount >= 10000` before returning tracks.
+   - In `resolveTrackVideoId`: Ensures only verified videos with >= 10k views are added to created YouTube playlists.
+2. **Anti-Literal Title Bias & Deep Lyrical Theme Extraction** ([`server/services/groq.js`](file:///server/services/groq.js)):
+   - Added strict anti-literal title rules to `DYNAMIC_SYSTEM_PROMPT`:
+     - Explicitly forbids packing playlists with songs matching literal prompt words (maximum 1-2 title matches permitted; 90%+ must match through lyrical and sonic depth).
+   - Upgraded `extractMusicalKeywords`:
+     - Translates literal concepts into emotional atmosphere, acoustic textures, and narrative themes (e.g. "rainy day" ➔ "introspective melancholic cozy acoustic guitar soft piano solitude nostalgia wistful longing warm gentle vocals lo-fi peaceful reflective").
+     - Generates dedicated `lyrical_themes` descriptions.
+3. **Harmonic & Semantic RAG Alignment** ([`server/routes/ai.js`](file:///server/routes/ai.js)):
+   - Injected the extracted lyrical narrative into `generateEmbedding(embeddingQuery)`, enabling Gemini pgvector search over 15,000+ songs to retrieve tracks whose actual lyrics match the mood, regardless of their song title.
+
+
 
