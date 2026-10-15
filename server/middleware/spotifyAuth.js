@@ -3,6 +3,30 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// In-memory token cache for Client Credentials Flow (avoids repeating grant on every request)
+let cachedGuestToken = null;
+let guestTokenExpiresAt = 0;
+
+export const getGuestSpotifyApi = async () => {
+    const guestApi = new SpotifyWebApi({
+        clientId: process.env.SPOTIFY_CLIENT_ID,
+        clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+    });
+
+    const now = Date.now();
+    if (cachedGuestToken && now < guestTokenExpiresAt) {
+        guestApi.setAccessToken(cachedGuestToken);
+        return guestApi;
+    }
+
+    const guestData = await guestApi.clientCredentialsGrant();
+    cachedGuestToken = guestData.body['access_token'];
+    // Expire 60 seconds early to prevent edge-case race conditions
+    guestTokenExpiresAt = now + ((guestData.body['expires_in'] || 3600) - 60) * 1000;
+    guestApi.setAccessToken(cachedGuestToken);
+    return guestApi;
+};
+
 export const initSpotifyApi = async (req, res, next) => {
     console.log(`[Auth Middleware] Processing request for ${req.path}`);
 
@@ -52,15 +76,10 @@ export const initSpotifyApi = async (req, res, next) => {
         }
     };
 
+
     // --- ALWAYS ADD A GUEST INSTANCE (For public search if User token is restricted) ---
     try {
-        const guestApi = new SpotifyWebApi({
-            clientId: process.env.SPOTIFY_CLIENT_ID,
-            clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
-        });
-        const guestData = await guestApi.clientCredentialsGrant();
-        guestApi.setAccessToken(guestData.body['access_token']);
-        req.guestSpotifyApi = guestApi;
+        req.guestSpotifyApi = await getGuestSpotifyApi();
         console.log('[Auth Middleware] Guest instance prepared (Backup).');
     } catch (gErr) {
         console.warn('[Auth Middleware] Guest Backup Instance failed:', gErr.message);

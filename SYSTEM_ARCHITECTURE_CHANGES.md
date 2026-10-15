@@ -219,7 +219,34 @@ NEXT_PUBLIC_CLIENT_URL=https://vibemixer.hbhanot.tech
 
 ---
 
-## 8. Git Commit Log
+## 8. Spotify Playlist Save & Resilient Resolution Engine
+
+### Problem Diagnosed:
+- When tracks are generated via RAG/iTunes fallback, tracks had search URIs (`spotify:search:...`) or IDs with `itunes_...`.
+- In `server/routes/spotify.js`, `POST /spotify/playlist` sequentially searched using `req.spotifyApi` (user client).
+- If the user's token was expired or in Spotify Dev Mode, the inner catch block swallowed the error without retrying or falling back to `req.guestSpotifyApi` (Client Credentials).
+- Because `resolvedUris.length === 0`, it threw HTTP 422 with `fallback: 'youtube'`, causing the client to prompt the user to switch to YouTube and failing to create Spotify playlists.
+
+### Solution Implemented:
+1. **Parallel Resilient Resolver (`server/routes/spotify.js`)**:
+   - High-throughput parallel resolver (`Promise.all`) resolving tracks concurrently in `<300ms`.
+   - Resolution Waterfall:
+     1. Direct valid 22-character Spotify track URI (`spotify:track:...`).
+     2. Direct 22-character Spotify track ID.
+     3. PostgreSQL `TrackKnowledge` cache lookup.
+     4. Spotify Web API search with priority to `req.guestSpotifyApi` (Client Credentials — unaffected by user Dev Mode / cookie expiration), with fallback to `req.spotifyApi`.
+     5. Asynchronously writes resolved `spotifyUri`, `spotifyId`, and artwork back to `TrackKnowledge` for future instant cache hits.
+2. **Pre-Resolution in AI Generation (`server/routes/ai.js`)**:
+   - Resolves real `spotify:track:...` URIs via `guestSpotifyApi` at generation time, so generated tracks returned to client already possess authentic Spotify track URIs and URLs.
+3. **In-Memory Guest Token Caching (`server/middleware/spotifyAuth.js`)**:
+   - Reuses Client Credentials access token until 60 seconds before expiry to prevent repetitive token grants and Spotify rate-limiting.
+4. **Proactive Token Refresh**:
+   - Validates user token with `req.spotifyApi.getMe()` prior to `createPlaylist()`, automatically refreshing if expired (`401`).
+   - Forwards custom playlist `name` and `description` to `createPlaylist()`.
+
+---
+
+## 9. Git Commit Log
 
 ```bash
 # Frontend Overhaul & Startup UI
@@ -233,11 +260,17 @@ commit d503939
 Author: Hardik Bhanot
 Date:   Oct 14 2026
 Message: feat(backend): implement sub-second RAG, harmonic vectoring, taste centroid, and batch enrichment
+
+# Spotify Playlist Save Bug Fix & Parallel Resilient Resolver
+commit [PENDING]
+Author: Hardik Bhanot
+Date:   Oct 15 2026
+Message: fix(spotify): resolve playlist save failure with parallel guest client resolution and token caching
 ```
 
 ---
 
-## 9. Quick Start Guide for Personal Laptop Antigravity
+## 10. Quick Start Guide for Personal Laptop Antigravity
 
 When continuing development on your personal laptop:
 

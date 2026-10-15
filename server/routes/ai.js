@@ -222,16 +222,41 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
 
                     // A. Instant Local Cache Hit with Artwork (0ms external latency)
                     if (localTrack && localTrack.coverImage) {
+                        let resolvedSpotifyUri = (localTrack.spotifyUri && /^spotify:track:[0-9A-Za-z]{22}$/.test(localTrack.spotifyUri))
+                            ? localTrack.spotifyUri
+                            : null;
+                        let resolvedSpotifyId = (localTrack.spotifyId && /^[0-9A-Za-z]{22}$/.test(localTrack.spotifyId))
+                            ? localTrack.spotifyId
+                            : null;
+
+                        if (!resolvedSpotifyUri) {
+                            try {
+                                const client = req.guestSpotifyApi || req.spotifyApi;
+                                if (client) {
+                                    const sRes = await client.searchTracks(`${cleanTitle} ${suggestion.artist}`, { limit: 1 });
+                                    const sItem = sRes.body?.tracks?.items?.[0];
+                                    if (sItem?.uri && /^spotify:track:[0-9A-Za-z]{22}$/.test(sItem.uri)) {
+                                        resolvedSpotifyUri = sItem.uri;
+                                        resolvedSpotifyId = sItem.id;
+                                        prisma.trackKnowledge.update({
+                                            where: { id: localTrack.id },
+                                            data: { spotifyUri: resolvedSpotifyUri, spotifyId: resolvedSpotifyId }
+                                        }).catch(() => {});
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+
                         const videoId = await scrapeYouTubeVideoId(`${cleanTitle} ${suggestion.artist} Official Audio`);
-                        const spotifyTrackUrl = localTrack.spotifyUri && /^spotify:track:[0-9A-Za-z]{22}$/.test(localTrack.spotifyUri)
-                            ? `https://open.spotify.com/track/${localTrack.spotifyUri.replace('spotify:track:', '')}`
+                        const spotifyTrackUrl = resolvedSpotifyUri
+                            ? `https://open.spotify.com/track/${resolvedSpotifyUri.replace('spotify:track:', '')}`
                             : `https://open.spotify.com/search/${encodeURIComponent(localTrack.title + ' ' + localTrack.artist)}`;
                         const youtubeTrackUrl = videoId
                             ? `https://www.youtube.com/watch?v=${videoId}`
                             : `https://www.youtube.com/results?search_query=${encodeURIComponent(localTrack.title + ' ' + localTrack.artist)}`;
 
                         return {
-                            id: localTrack.spotifyId || localTrack.id,
+                            id: resolvedSpotifyId || localTrack.spotifyId || localTrack.id,
                             videoId: videoId || null,
                             name: localTrack.title,
                             artists: [{ name: localTrack.artist }],
@@ -239,7 +264,7 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
                                 name: localTrack.title,
                                 images: [{ url: localTrack.coverImage, height: 600, width: 600 }]
                             },
-                            uri: localTrack.spotifyUri || `spotify:search:${encodeURIComponent(localTrack.title + ' ' + localTrack.artist)}`,
+                            uri: resolvedSpotifyUri || localTrack.spotifyUri || `spotify:search:${encodeURIComponent(localTrack.title + ' ' + localTrack.artist)}`,
                             external_urls: {
                                 spotify: spotifyTrackUrl,
                                 youtube: youtubeTrackUrl
@@ -257,6 +282,27 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
                     // B. Ultra-fast iTunes Resolver (<100ms, free, high-res artwork)
                     const itunesMeta = await fetchTrackMetadata(cleanTitle, suggestion.artist);
                     if (itunesMeta && itunesMeta.coverImage) {
+                        let resolvedSpotifyUri = (localTrack?.spotifyUri && /^spotify:track:[0-9A-Za-z]{22}$/.test(localTrack.spotifyUri))
+                            ? localTrack.spotifyUri
+                            : null;
+                        let resolvedSpotifyId = (localTrack?.spotifyId && /^[0-9A-Za-z]{22}$/.test(localTrack.spotifyId))
+                            ? localTrack.spotifyId
+                            : null;
+
+                        if (!resolvedSpotifyUri) {
+                            try {
+                                const client = req.guestSpotifyApi || req.spotifyApi;
+                                if (client) {
+                                    const sRes = await client.searchTracks(`${cleanTitle} ${suggestion.artist}`, { limit: 1 });
+                                    const sItem = sRes.body?.tracks?.items?.[0];
+                                    if (sItem?.uri && /^spotify:track:[0-9A-Za-z]{22}$/.test(sItem.uri)) {
+                                        resolvedSpotifyUri = sItem.uri;
+                                        resolvedSpotifyId = sItem.id;
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+
                         // Asynchronously persist to database so future requests are instant
                         if (localTrack) {
                             prisma.trackKnowledge.update({
@@ -264,21 +310,43 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
                                 data: {
                                     coverImage: itunesMeta.coverImage,
                                     previewUrl: itunesMeta.previewUrl,
+                                    durationMs: itunesMeta.durationMs,
+                                    ...(resolvedSpotifyUri ? { spotifyUri: resolvedSpotifyUri, spotifyId: resolvedSpotifyId } : {})
+                                }
+                            }).catch(() => {});
+                        } else if (cleanTitle && resolvedSpotifyUri) {
+                            prisma.trackKnowledge.upsert({
+                                where: { title_artist: { title: cleanTitle, artist: suggestion.artist } },
+                                update: {
+                                    spotifyUri: resolvedSpotifyUri,
+                                    spotifyId: resolvedSpotifyId,
+                                    coverImage: itunesMeta.coverImage,
+                                    previewUrl: itunesMeta.previewUrl,
                                     durationMs: itunesMeta.durationMs
+                                },
+                                create: {
+                                    title: cleanTitle,
+                                    artist: suggestion.artist,
+                                    lyrics: '',
+                                    spotifyUri: resolvedSpotifyUri,
+                                    spotifyId: resolvedSpotifyId,
+                                    coverImage: itunesMeta.coverImage,
+                                    previewUrl: itunesMeta.previewUrl,
+                                    durationMs: itunesMeta.durationMs || 210000
                                 }
                             }).catch(() => {});
                         }
 
                         const videoId = await scrapeYouTubeVideoId(`${cleanTitle} ${suggestion.artist} Official Audio`);
-                        const spotifyTrackUrl = localTrack?.spotifyUri && /^spotify:track:[0-9A-Za-z]{22}$/.test(localTrack.spotifyUri)
-                            ? `https://open.spotify.com/track/${localTrack.spotifyUri.replace('spotify:track:', '')}`
+                        const spotifyTrackUrl = resolvedSpotifyUri
+                            ? `https://open.spotify.com/track/${resolvedSpotifyUri.replace('spotify:track:', '')}`
                             : `https://open.spotify.com/search/${encodeURIComponent(suggestion.song + ' ' + suggestion.artist)}`;
                         const youtubeTrackUrl = videoId
                             ? `https://www.youtube.com/watch?v=${videoId}`
                             : `https://www.youtube.com/results?search_query=${encodeURIComponent(suggestion.song + ' ' + suggestion.artist)}`;
 
                         return {
-                            id: localTrack?.spotifyId || `itunes_${cleanTitle.toLowerCase().replace(/\s+/g, '_')}`,
+                            id: resolvedSpotifyId || localTrack?.spotifyId || `itunes_${cleanTitle.toLowerCase().replace(/\s+/g, '_')}`,
                             videoId: videoId || null,
                             name: localTrack?.title || suggestion.song,
                             artists: [{ name: localTrack?.artist || suggestion.artist }],
@@ -286,7 +354,7 @@ router.post('/analyze', initSpotifyApi, async (req, res) => {
                                 name: suggestion.song,
                                 images: [{ url: itunesMeta.coverImage, height: 600, width: 600 }]
                             },
-                            uri: localTrack?.spotifyUri || `spotify:search:${encodeURIComponent(suggestion.song + ' ' + suggestion.artist)}`,
+                            uri: resolvedSpotifyUri || localTrack?.spotifyUri || `spotify:search:${encodeURIComponent(suggestion.song + ' ' + suggestion.artist)}`,
                             external_urls: {
                                 spotify: spotifyTrackUrl,
                                 youtube: youtubeTrackUrl
