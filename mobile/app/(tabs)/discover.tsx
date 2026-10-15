@@ -15,6 +15,8 @@ const { width } = Dimensions.get('window');
 export default function DiscoverScreen() {
     const colorScheme = useColorScheme();
     const router = useRouter();
+    const [vibes, setVibes] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
     useEffect(() => {
@@ -68,7 +70,7 @@ export default function DiscoverScreen() {
                         <FontAwesome name="circle-o-notch" size={30} color="#8B5CF6" style={{ alignSelf: 'center' }} />
                     </View>
                 ) : (
-                    vibes.map((vibe) => (
+                    vibes.map((vibe: any) => (
                         <TouchableOpacity
                             key={vibe.id}
                             style={styles.card}
