@@ -47,3 +47,6 @@ server/data/lyrics.csv
 server/out.json
 server/test*
 test_image.jpg
+Data/
+data/
+
