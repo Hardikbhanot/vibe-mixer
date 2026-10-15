@@ -204,7 +204,9 @@ const SwipeCards = ({ tracks, onEmpty }: SwipeCardsProps) => {
                                 onClick={() => confirmPlatform('spotify', (document.getElementById('remember') as HTMLInputElement)?.checked)}
                                 className="flex flex-col items-center gap-2 p-4 rounded-xl bg-[#1DB954]/10 hover:bg-[#1DB954]/20 transition-colors"
                             >
-                                <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_Green.png" className="h-8 w-auto" alt="Spotify" />
+                                <svg className="w-8 h-8 text-[#1DB954] fill-current" viewBox="0 0 24 24">
+                                    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.485 17.308c-.215.354-.676.467-1.03.252-2.824-1.725-6.38-2.115-10.57-1.157-.402.092-.803-.16-.895-.562-.092-.403.159-.804.562-.896 4.585-1.047 8.52-.605 11.68 1.333.355.215.468.676.253 1.03zm1.464-3.26c-.27.44-.848.578-1.287.308-3.232-1.986-8.16-2.56-11.983-1.4-1.493.15-2.007-.34-2.158-.832-.15-.492.34-.984.832-1.135 4.372-1.326 9.8-1.686 13.506.586.44.27.578.847.308 1.287l-.218.186zm.126-3.41c-3.876-2.302-10.27-2.513-13.988-1.384-.595.18-1.22-.164-1.4-.76-.18-.595.165-1.22.76-1.4 4.267-1.296 11.31-1.054 15.77 1.595.534.317.708 1.01.39 1.545-.317.534-1.01.708-1.545.39z"/>
+                                </svg>
                                 <span className="text-sm font-bold text-[#1DB954]">Spotify</span>
                             </button>
                             <button

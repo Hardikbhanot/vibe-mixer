@@ -605,15 +605,17 @@ function ResultsContent() {
                                                 : 'bg-[#1DB954] hover:bg-[#1ed760] text-white hover:scale-[1.02] active:scale-[0.98]'
                                         } disabled:opacity-50`}
                                     >
-                                        <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_White.png" alt="Spotify" className="h-5 w-auto" />
-                                        <span>{isSaving ? 'Exporting...' : isSavedToSpotify ? 'Saved to Spotify ✓' : 'Save to Spotify'}</span>
+                                        <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
+                                            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.485 17.308c-.215.354-.676.467-1.03.252-2.824-1.725-6.38-2.115-10.57-1.157-.402.092-.803-.16-.895-.562-.092-.403.159-.804.562-.896 4.585-1.047 8.52-.605 11.68 1.333.355.215.468.676.253 1.03zm1.464-3.26c-.27.44-.848.578-1.287.308-3.232-1.986-8.16-2.56-11.983-1.4-1.493.15-2.007-.34-2.158-.832-.15-.492.34-.984.832-1.135 4.372-1.326 9.8-1.686 13.506.586.44.27.578.847.308 1.287l-.218.186zm.126-3.41c-3.876-2.302-10.27-2.513-13.988-1.384-.595.18-1.22-.164-1.4-.76-.18-.595.165-1.22.76-1.4 4.267-1.296 11.31-1.054 15.77 1.595.534.317.708 1.01.39 1.545-.317.534-1.01.708-1.545.39z"/>
+                                        </svg>
+                                        <span className="whitespace-nowrap">{isSaving ? 'Exporting...' : isSavedToSpotify ? 'Saved to Spotify ✓' : 'Save to Spotify'}</span>
                                         {spotifyPlaylistUrl && (
                                             <a
                                                 href={spotifyPlaylistUrl}
                                                 target="_blank"
                                                 rel="noreferrer"
                                                 onClick={(e) => e.stopPropagation()}
-                                                className="ml-1 p-1 hover:bg-black/20 rounded-md"
+                                                className="ml-1 p-1 hover:bg-black/20 rounded-md shrink-0"
                                                 title="Open in Spotify"
                                             >
                                                 <span className="material-symbols-outlined text-sm">open_in_new</span>
@@ -628,10 +630,13 @@ function ResultsContent() {
                                             const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
                                             window.location.href = `${apiUrl}/auth/login?next=/results&origin=${encodeURIComponent(currentOrigin)}`;
                                         }}
+                                        title="Connect Spotify to save playlist"
                                         className="flex items-center justify-center gap-2 h-11 px-5 rounded-xl bg-transparent border-2 border-[#1DB954] text-[#1DB954] font-bold text-sm hover:bg-[#1DB954] hover:text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                                     >
-                                        <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_Green.png" alt="Spotify" className="h-5 w-auto" />
-                                        <span>Connect Spotify to Save</span>
+                                        <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
+                                            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.485 17.308c-.215.354-.676.467-1.03.252-2.824-1.725-6.38-2.115-10.57-1.157-.402.092-.803-.16-.895-.562-.092-.403.159-.804.562-.896 4.585-1.047 8.52-.605 11.68 1.333.355.215.468.676.253 1.03zm1.464-3.26c-.27.44-.848.578-1.287.308-3.232-1.986-8.16-2.56-11.983-1.4-1.493.15-2.007-.34-2.158-.832-.15-.492.34-.984.832-1.135 4.372-1.326 9.8-1.686 13.506.586.44.27.578.847.308 1.287l-.218.186zm.126-3.41c-3.876-2.302-10.27-2.513-13.988-1.384-.595.18-1.22-.164-1.4-.76-.18-.595.165-1.22.76-1.4 4.267-1.296 11.31-1.054 15.77 1.595.534.317.708 1.01.39 1.545-.317.534-1.01.708-1.545.39z"/>
+                                        </svg>
+                                        <span className="whitespace-nowrap">Connect Spotify</span>
                                     </button>
                                 )}
 
@@ -645,14 +650,14 @@ function ResultsContent() {
                                     } disabled:opacity-50`}
                                 >
                                     <span className="material-symbols-outlined text-xl">play_circle</span>
-                                    <span>{isSavingYoutube ? 'Exporting...' : isSavedToYoutube ? 'Saved to YouTube ✓' : 'Save to YouTube'}</span>
+                                    <span className="whitespace-nowrap">{isSavingYoutube ? 'Exporting...' : isSavedToYoutube ? 'Saved to YouTube ✓' : 'Save to YouTube'}</span>
                                     {youtubePlaylistUrl && (
                                         <a
                                             href={youtubePlaylistUrl}
                                             target="_blank"
                                             rel="noreferrer"
                                             onClick={(e) => e.stopPropagation()}
-                                            className="ml-1 p-1 hover:bg-black/20 rounded-md"
+                                            className="ml-1 p-1 hover:bg-black/20 rounded-md shrink-0"
                                             title="Open in YouTube"
                                         >
                                             <span className="material-symbols-outlined text-sm">open_in_new</span>
@@ -883,7 +888,9 @@ function ResultsContent() {
                                     onClick={() => confirmPlatform('spotify', (document.getElementById('remember_res') as HTMLInputElement)?.checked)}
                                     className="flex flex-col items-center gap-2 p-4 rounded-xl bg-[#1DB954]/10 hover:bg-[#1DB954]/20 transition-colors"
                                 >
-                                    <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_Green.png" className="h-8 w-auto" alt="Spotify" />
+                                    <svg className="w-8 h-8 text-[#1DB954] fill-current" viewBox="0 0 24 24">
+                                        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.485 17.308c-.215.354-.676.467-1.03.252-2.824-1.725-6.38-2.115-10.57-1.157-.402.092-.803-.16-.895-.562-.092-.403.159-.804.562-.896 4.585-1.047 8.52-.605 11.68 1.333.355.215.468.676.253 1.03zm1.464-3.26c-.27.44-.848.578-1.287.308-3.232-1.986-8.16-2.56-11.983-1.4-1.493.15-2.007-.34-2.158-.832-.15-.492.34-.984.832-1.135 4.372-1.326 9.8-1.686 13.506.586.44.27.578.847.308 1.287l-.218.186zm.126-3.41c-3.876-2.302-10.27-2.513-13.988-1.384-.595.18-1.22-.164-1.4-.76-.18-.595.165-1.22.76-1.4 4.267-1.296 11.31-1.054 15.77 1.595.534.317.708 1.01.39 1.545-.317.534-1.01.708-1.545.39z"/>
+                                    </svg>
                                     <span className="text-sm font-bold text-[#1DB954]">Spotify</span>
                                 </button>
                                 <button
