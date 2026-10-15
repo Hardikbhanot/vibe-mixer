@@ -300,7 +300,33 @@ Message: fix(youtube): resolve 'playlist does not exist' with unlisted status an
 
 ---
 
-## 11. Quick Start Guide for Personal Laptop Antigravity
+## 11. Profile Photo Auto-Save & Real-Time Sync Architecture
+
+### Root Cause Analysis of Photo Vanishing & Header Missing Avatar
+1. **Vanishing Photo on Page Reload**:
+   - In [`client/app/profile/page.tsx`](file:///client/app/profile/page.tsx), `handleImageUpload` previously only updated local React state (`profileData.avatarUrl`) and popped a toast notification `"Photo updated!"`.
+   - It did **not** send an API call to save the base64 photo to the PostgreSQL database. The "Save Changes" button was tucked away inside the "Settings" tab. When reloading, `fetchProfile()` re-fetched the database user record, where `avatarUrl` was still `null`, causing the photo to vanish.
+2. **Missing Photo in Header**:
+   - [`client/components/Header.tsx`](file:///client/components/Header.tsx) reads `user.avatarUrl` from [`client/context/AuthContext.tsx`](file:///client/context/AuthContext.tsx).
+   - `AuthContext` only provided static auth state without exposing `setUser` or `refreshUser`. Even when a photo was loaded in the profile view, `AuthContext` was never updated, leaving the Header displaying the initial letter initial circle.
+3. **Partial Updates in Backend (`server/routes/user.js`)**:
+   - `PUT /api/user/profile` previously took all fields (`username`, `bio`, etc.) at once. If `username` was empty string `""`, it attempted to set `""` on a `@unique` PostgreSQL column, causing constraint conflicts.
+
+### Resolution Implemented:
+1. **Instant Auto-Save on Selection** ([`client/app/profile/page.tsx`](file:///client/app/profile/page.tsx)):
+   - Immediately compresses selected image via canvas (max 300px, 85% JPEG).
+   - Optimistically updates `profileData.avatarUrl` and `AuthContext`'s `user.avatarUrl`.
+   - Sends an immediate `PUT /api/user/profile` request with `{ avatarUrl: compressedBase64 }` directly to the backend database.
+   - Shows active upload spinner state (`isUploadingPhoto`) with `"Saving..."` feedback.
+2. **Global AuthContext State Synchronization** ([`client/context/AuthContext.tsx`](file:///client/context/AuthContext.tsx)):
+   - Exposed `setUser` and `refreshUser: checkUserLoggedIn` in `AuthContext.Provider`.
+   - Any avatar change immediately propagates to the desktop and mobile [`Header`](file:///client/components/Header.tsx) without requiring a page reload.
+3. **Selective Partial Updates** ([`server/routes/user.js`](file:///server/routes/user.js)):
+   - Refactored `PUT /api/user/profile` to dynamically build `dataToUpdate`, updating only fields explicitly supplied in the request body and validating username non-empty strings.
+
+---
+
+## 12. Quick Start Guide for Personal Laptop Antigravity
 
 When continuing development on your personal laptop:
 
