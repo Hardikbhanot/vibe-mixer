@@ -323,7 +323,7 @@ function ResultsContent() {
             if (!response.ok || result.needsFallback || result.trackCount === 0) {
                 console.warn("[Save to Spotify] Fallback required:", result.error || "0 tracks resolved");
                 toast.error(
-                    result.message || result.error || "Spotify API requires developer Premium to add tracks. Switching to Tier 2 (YouTube)...",
+                    result.error || result.message || "Spotify write access restricted. Try saving to YouTube or your profile library!",
                     {
                         duration: 8000,
                         action: {

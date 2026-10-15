@@ -265,7 +265,7 @@ router.get('/login', (req, res) => {
     const state = Buffer.from(JSON.stringify({ platform, next, origin })).toString('base64');
     console.log('[Spotify Auth] Generated State:', state);
 
-    const authorizeURL = spotifyApi.createAuthorizeURL(scopes, state);
+    const authorizeURL = spotifyApi.createAuthorizeURL(scopes, state, true);
     res.redirect(authorizeURL);
 });
 

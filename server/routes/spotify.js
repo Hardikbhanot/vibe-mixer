@@ -185,13 +185,52 @@ router.post('/playlist', initSpotifyApi, async (req, res) => {
         const playlistId = createData.body.id;
         console.log(`[Spotify Route] Playlist created with ID: ${playlistId}`);
 
-        // 3. Add Tracks in Chunks of 50 (Spotify limit is 100 per call)
+        // 3. Add Tracks in Chunks of 50 using modern /items endpoint
         const chunkSize = 50;
+        const accessToken = req.spotifyApi.getAccessToken();
+
         for (let i = 0; i < resolvedUris.length; i += chunkSize) {
             const chunk = resolvedUris.slice(i, i + chunkSize);
-            await req.spotifyApi.addTracksToPlaylist(playlistId, chunk);
+            
+            // Primary modern endpoint: POST /v1/playlists/{playlist_id}/items
+            let added = false;
+            try {
+                const itemsUrl = `https://api.spotify.com/v1/playlists/${playlistId}/items`;
+                const itemsRes = await fetch(itemsUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ uris: chunk })
+                });
+
+                if (itemsRes.ok) {
+                    added = true;
+                } else {
+                    const errData = await itemsRes.json().catch(() => ({}));
+                    console.warn(`[Spotify Route] /items endpoint returned ${itemsRes.status}:`, errData);
+                    
+                    // Fallback to SDK /tracks call
+                    try {
+                        await req.spotifyApi.addTracksToPlaylist(playlistId, chunk);
+                        added = true;
+                    } catch (sdkErr) {
+                        const finalErr = new Error(errData?.error?.message || sdkErr.message || `Failed to add tracks (${itemsRes.status})`);
+                        finalErr.statusCode = itemsRes.status || sdkErr.statusCode || 500;
+                        finalErr.body = errData;
+                        throw finalErr;
+                    }
+                }
+            } catch (chunkErr) {
+                if (added) continue;
+                // If chunkErr has statusCode, rethrow it
+                if (chunkErr.statusCode) throw chunkErr;
+                // Last ditch: try SDK directly
+                await req.spotifyApi.addTracksToPlaylist(playlistId, chunk);
+            }
         }
-        console.log(`[Spotify Route] Added ${resolvedUris.length} tracks to playlist.`);
+        console.log(`[Spotify Route] Successfully added ${resolvedUris.length} tracks to playlist.`);
 
         // 4. Safely Upload Cover Image (Optional Enhancement, Never Blocks)
         if (coverImageUrl && typeof coverImageUrl === 'string') {
@@ -255,6 +294,28 @@ router.post('/playlist', initSpotifyApi, async (req, res) => {
                 console.error('[Spotify Route] Retry failed:', retryError);
                 return res.status(401).json({ error: 'Session expired. Please login again.', needsLogin: true });
             }
+        }
+
+        // Check for 403 Forbidden (Whitelisting / Development Mode / Permission scopes)
+        const isForbidden = error.statusCode === 403 || (error.body && error.body.error && error.body.error.status === 403);
+        if (isForbidden) {
+            const rawMsg = error.body?.error?.message || error.message || 'Forbidden';
+            console.error('[Spotify Route] 403 Forbidden encountered:', rawMsg, error.body);
+
+            let userMsg = 'Spotify access restricted (403 Forbidden).';
+            if (rawMsg.toLowerCase().includes('scope') || rawMsg.toLowerCase().includes('permission')) {
+                userMsg = 'Spotify playlist permission was not granted. Please reconnect your Spotify account.';
+            } else {
+                userMsg = 'Spotify API returned Forbidden (403). In Development Mode, Spotify requires adding your Spotify account email to the Spotify Developer Dashboard (Users and Access whitelist).';
+            }
+
+            return res.status(403).json({
+                error: userMsg,
+                rawError: rawMsg,
+                needsFallback: true,
+                fallback: 'youtube',
+                trackCount: 0
+            });
         }
 
         // Check for 422 Unprocessable Entity (Needs Fallback)

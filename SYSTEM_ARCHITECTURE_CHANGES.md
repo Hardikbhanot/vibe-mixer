@@ -408,3 +408,28 @@ When continuing development on your personal laptop:
      - **Feature Navigation Cards**: Visual list with icons, titles, and descriptions for Studio, Taste Deck, Radar, Community, Vibe Match, and Messages.
      - **Bottom Utility Bar**: Features one-tap Theme Toggle and Red-accented Sign Out button.
 
+---
+
+## 14. Spotify 403 Forbidden Root Cause & Resolution
+
+### Root Cause Analysis
+1. **Endpoint Deprecation in Spotify Web API**:
+   - The legacy `spotify-web-api-node` library internally called `POST /v1/playlists/{playlist_id}/tracks` when adding tracks.
+   - In late 2024 / 2025, Spotify officially deprecated `/tracks` for playlist modifications in favor of the unified `POST /v1/playlists/{playlist_id}/items` endpoint. Calling the deprecated route triggers an immediate `403 Forbidden` from Spotify's API gateways.
+2. **Spotify Developer Mode Whitelist Enforcement**:
+   - While an app is in **Development Mode** on the Spotify Developer Portal, Spotify strictly limits write operations and OAuth access to accounts explicitly registered in the app's **Users and Access / User Management** whitelist (maximum 25 users).
+   - Any external Spotify account attempting to create a playlist or modify items receives a `403 Forbidden` response.
+3. **Stale Scopes on Existing Tokens**:
+   - If a user previously authorized VibeMixer before `playlist-modify-public` and `playlist-modify-private` were added, Spotify re-issued tokens without the latest scopes unless explicitly forced with `show_dialog=true`.
+
+### Fix Implementation:
+1. **Direct `/items` Endpoint with SDK Fallback** ([`server/routes/spotify.js`](file:///server/routes/spotify.js)):
+   - Replaced `req.spotifyApi.addTracksToPlaylist` with a direct call to `POST https://api.spotify.com/v1/playlists/${playlistId}/items` using the user's active bearer token.
+   - Retained automatic chunking (50 tracks per batch) and graceful fallback to the SDK method if needed.
+2. **Forced Scope Dialog Refresh** ([`server/routes/auth.js`](file:///server/routes/auth.js)):
+   - Updated `spotifyApi.createAuthorizeURL(scopes, state, true)` to include `show_dialog=true`. This ensures users are prompted to consent to playlist write permissions (`playlist-modify-public`, `playlist-modify-private`, `ugc-image-upload`).
+3. **Actionable 403 Error Handling & 1-Click Fallback** ([`server/routes/spotify.js`](file:///server/routes/spotify.js), [`client/app/results/page.tsx`](file:///client/app/results/page.tsx)):
+   - Specifically catches `403 Forbidden` responses and parses the underlying Spotify error payload.
+   - Surfaces a helpful, human-readable message explaining the Spotify Developer whitelist requirement, and provides an immediate 1-click fallback button to **"Save to YouTube 🎬"** or save to profile library so playlists are never lost.
+
+
