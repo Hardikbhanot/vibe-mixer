@@ -10,7 +10,7 @@ const initYoutubeClient = async (req, res, next) => {
     console.log('[YouTube Auth] Checking tokens...');
     // Check Cookies OR Headers (for Mobile)
     let accessToken = req.cookies.google_access_token || req.headers['x-google-token'];
-    const refreshToken = req.cookies.google_refresh_token || req.headers['x-google-refresh-token'];
+    let refreshToken = req.cookies.google_refresh_token || req.headers['x-google-refresh-token'];
 
     const isProduction = process.env.NODE_ENV === 'production';
     const domain = isProduction ? '.vibemixer.hbhanot.tech' : undefined;
@@ -30,96 +30,126 @@ const initYoutubeClient = async (req, res, next) => {
         });
     }
 
+    // Always provide both tokens so googleapis can automatically refresh if needed
+    oauth2Client.setCredentials({ 
+        access_token: accessToken || undefined,
+        refresh_token: refreshToken || undefined
+    });
+
+    // Listen for automatic token refreshes by the googleapis client
+    oauth2Client.on('tokens', (tokens) => {
+        if (tokens.access_token) {
+            accessToken = tokens.access_token;
+            res.cookie('google_access_token', tokens.access_token, {
+                httpOnly: true,
+                secure: isProduction,
+                maxAge: tokens.expiry_date ? Math.max(tokens.expiry_date - Date.now(), 60000) : 3600 * 1000,
+                path: '/',
+                sameSite: isProduction ? 'none' : 'lax',
+                domain: domain
+            });
+        }
+        if (tokens.refresh_token) {
+            refreshToken = tokens.refresh_token;
+            res.cookie('google_refresh_token', tokens.refresh_token, {
+                httpOnly: true,
+                secure: isProduction,
+                path: '/',
+                sameSite: isProduction ? 'none' : 'lax',
+                domain: domain
+            });
+        }
+    });
+
     if (!accessToken && refreshToken) {
         try {
-            console.log('[YouTube Auth] Refreshing token...');
-            oauth2Client.setCredentials({ refresh_token: refreshToken });
+            console.log('[YouTube Auth] Access token missing, refreshing from refresh token...');
             const { credentials } = await oauth2Client.refreshAccessToken();
             accessToken = credentials.access_token;
+            oauth2Client.setCredentials(credentials);
 
             res.cookie('google_access_token', accessToken, {
                 httpOnly: true,
                 secure: isProduction,
-                maxAge: (credentials.expiry_date - Date.now()),
+                maxAge: credentials.expiry_date ? Math.max(credentials.expiry_date - Date.now(), 60000) : 3600 * 1000,
                 path: '/',
                 sameSite: isProduction ? 'none' : 'lax',
                 domain: domain
             });
         } catch (error) {
             console.error('Google Token Refresh Error:', error);
-            return res.status(401).json({ error: 'Session expired' });
+            return res.status(401).json({ error: 'Session expired', needsLogin: true });
         }
     }
 
-    oauth2Client.setCredentials({ access_token: accessToken });
+    req.oauth2Client = oauth2Client;
     req.youtube = google.youtube({ version: 'v3', auth: oauth2Client });
     next();
 };
 
 // Create Playlist and Add Tracks
 router.post('/playlist', initYoutubeClient, async (req, res) => {
-    const { name, description, tracks, coverImage } = req.body;
+    const { name, description, tracks, isPublic } = req.body;
 
     if (!tracks || !Array.isArray(tracks) || tracks.length === 0) {
         return res.status(400).json({ error: 'At least one track is required to create a YouTube playlist.' });
     }
 
     try {
-        // 1. Resolve Video IDs FIRST to guarantee no empty playlists are created
-        const videoIds = [];
-        for (const track of tracks) {
-            try {
-                // Check if track already has a videoId
-                let videoId = track.videoId;
-                if (!videoId && track.external_urls?.youtube) {
-                    const match = track.external_urls.youtube.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-                    if (match) videoId = match[1];
-                }
-
-                if (videoId) {
-                    videoIds.push(videoId);
-                    continue;
-                }
-
-                const artistName = track.artist || track.artists?.[0]?.name || '';
-                const query = `${track.name || ''} ${artistName} Official Audio`.trim();
-
-                let foundId = null;
-
-                // Priority A: Zero-quota high-speed scraper (<200ms, unlimited)
-                try {
-                    foundId = await scrapeYouTubeVideoId(query);
-                } catch (sErr) {
-                    // Fallthrough to API
-                }
-
-                // Priority B: User Google OAuth Search (if scraper returned null)
-                if (!foundId) {
-                    try {
-                        const searchRes = await req.youtube.search.list({
-                            part: ['snippet'],
-                            q: query,
-                            maxResults: 1,
-                            type: ['video'],
-                        });
-
-                        if (searchRes.data.items && searchRes.data.items.length > 0) {
-                            foundId = searchRes.data.items[0].id.videoId;
-                        }
-                    } catch (userSearchErr) {
-                        console.warn(`[YouTube Route] User search quota exhausted for "${track.name}", using rotator:`, userSearchErr.message);
-                        const fallbackTrack = await searchYouTube(query);
-                        if (fallbackTrack && fallbackTrack.id) {
-                            foundId = fallbackTrack.id;
-                        }
-                    }
-                }
-
-                if (foundId) videoIds.push(foundId);
-            } catch (err) {
-                console.warn(`[YouTube Route] Failed to find video for "${track.name}":`, err.message);
+        // 1. Resolve Video IDs FIRST with high-concurrency parallel resolution
+        console.log(`[YouTube Route] Resolving video IDs for ${tracks.length} tracks...`);
+        const resolveTrackVideoId = async (track) => {
+            // Check if track already has an authentic 11-char videoId
+            if (track.videoId && /^[a-zA-Z0-9_-]{11}$/.test(track.videoId)) {
+                return track.videoId;
             }
-        }
+            if (track.external_urls?.youtube) {
+                const match = track.external_urls.youtube.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+                if (match && /^[a-zA-Z0-9_-]{11}$/.test(match[1])) {
+                    return match[1];
+                }
+            }
+
+            const artistName = track.artist || track.artists?.[0]?.name || '';
+            const query = `${track.name || ''} ${artistName} Official Audio`.trim();
+
+            // Priority A: Zero-quota high-speed scraper (<200ms)
+            try {
+                const scrapedId = await scrapeYouTubeVideoId(query);
+                if (scrapedId && /^[a-zA-Z0-9_-]{11}$/.test(scrapedId)) {
+                    return scrapedId;
+                }
+            } catch (sErr) {}
+
+            // Priority B: User Google OAuth Search
+            try {
+                const searchRes = await req.youtube.search.list({
+                    part: ['snippet'],
+                    q: query,
+                    maxResults: 1,
+                    type: ['video'],
+                });
+                const item = searchRes.data?.items?.[0];
+                if (item?.id?.videoId && /^[a-zA-Z0-9_-]{11}$/.test(item.id.videoId)) {
+                    return item.id.videoId;
+                }
+            } catch (userSearchErr) {
+                // Priority C: Centralized Rotator API Keys
+                try {
+                    const fallbackTrack = await searchYouTube(query);
+                    if (fallbackTrack?.id && /^[a-zA-Z0-9_-]{11}$/.test(fallbackTrack.id)) {
+                        return fallbackTrack.id;
+                    }
+                } catch (rotatorErr) {}
+            }
+
+            return null;
+        };
+
+        const resolvedIds = await Promise.all(tracks.map(t => resolveTrackVideoId(t)));
+        const videoIds = resolvedIds.filter(Boolean);
+
+        console.log(`[YouTube Route] Successfully resolved ${videoIds.length}/${tracks.length} video IDs`);
 
         if (videoIds.length === 0) {
             return res.status(422).json({
@@ -128,9 +158,13 @@ router.post('/playlist', initYoutubeClient, async (req, res) => {
             });
         }
 
-        // 2. Create Playlist on User's YouTube Channel (Use 'private' for unverified OAuth apps)
+        // 2. Create Playlist on User's YouTube Channel
+        // IMPORTANT: 'unlisted' allows anyone with the direct link to immediately view and play the playlist.
+        // 'private' causes YouTube to display "The playlist does not exist." unless viewed inside YouTube Studio!
+        const requestedPrivacy = isPublic === true ? 'public' : 'unlisted';
         const playlistTitle = (name || 'My VibeMixer Playlist').trim();
-        console.log(`[YouTube Route] Creating playlist: "${playlistTitle}" for ${videoIds.length} videos`);
+        console.log(`[YouTube Route] Creating playlist: "${playlistTitle}" (${requestedPrivacy}) for ${videoIds.length} videos`);
+
         let playlistRes;
         try {
             playlistRes = await req.youtube.playlists.insert({
@@ -141,35 +175,51 @@ router.post('/playlist', initYoutubeClient, async (req, res) => {
                         description: description || 'Generated by VibeMixer AI Vibe DJ',
                     },
                     status: {
-                        privacyStatus: 'private',
+                        privacyStatus: requestedPrivacy,
                     },
                 },
             });
         } catch (insertErr) {
-            console.warn('[YouTube Route] Playlist insert with private status failed, attempting unlisted fallback...', insertErr.message);
-            playlistRes = await req.youtube.playlists.insert({
-                part: ['snippet', 'status'],
-                requestBody: {
-                    snippet: {
-                        title: playlistTitle,
-                        description: description || 'Generated by VibeMixer AI Vibe DJ',
+            console.warn(`[YouTube Route] Playlist insert with ${requestedPrivacy} status failed: ${insertErr.message}, attempting unlisted/private fallback...`);
+            try {
+                playlistRes = await req.youtube.playlists.insert({
+                    part: ['snippet', 'status'],
+                    requestBody: {
+                        snippet: {
+                            title: playlistTitle,
+                            description: description || 'Generated by VibeMixer AI Vibe DJ',
+                        },
+                        status: {
+                            privacyStatus: 'unlisted',
+                        },
                     },
-                    status: {
-                        privacyStatus: 'unlisted',
+                });
+            } catch (unlistedErr) {
+                console.warn('[YouTube Route] Unlisted insert failed, falling back to private:', unlistedErr.message);
+                playlistRes = await req.youtube.playlists.insert({
+                    part: ['snippet', 'status'],
+                    requestBody: {
+                        snippet: {
+                            title: playlistTitle,
+                            description: description || 'Generated by VibeMixer AI Vibe DJ',
+                        },
+                        status: {
+                            privacyStatus: 'private',
+                        },
                     },
-                },
-            });
+                });
+            }
         }
 
         const playlistId = playlistRes.data.id;
-        console.log(`[YouTube Route] Playlist created: ${playlistId}`);
-
+        console.log(`[YouTube Route] Playlist created: ${playlistId} (status: ${playlistRes.data.status?.privacyStatus})`);
         console.log(`[YouTube Route] Adding ${videoIds.length} videos to playlist ${playlistId}...`);
 
-        // 4. Add videos to playlist
+        // 3. Add videos to playlist
+        let insertedCount = 0;
         for (const videoId of videoIds) {
             try {
-                await req.youtube.playlistItems.insert({
+                const itemRes = await req.youtube.playlistItems.insert({
                     part: ['snippet'],
                     requestBody: {
                         snippet: {
@@ -181,18 +231,46 @@ router.post('/playlist', initYoutubeClient, async (req, res) => {
                         },
                     },
                 });
+                insertedCount++;
+                console.log(`[YouTube Route] Inserted video ${videoId} (item: ${itemRes.data?.id})`);
             } catch (err) {
                 console.warn(`[YouTube Route] Failed to insert video ${videoId}:`, err.message);
+                // In case of token expiration midway through insertions, refresh and retry once
+                if (err.code === 401 && req.oauth2Client) {
+                    try {
+                        const { credentials } = await req.oauth2Client.refreshAccessToken();
+                        req.oauth2Client.setCredentials(credentials);
+                        const retryRes = await req.youtube.playlistItems.insert({
+                            part: ['snippet'],
+                            requestBody: {
+                                snippet: {
+                                    playlistId: playlistId,
+                                    resourceId: {
+                                        kind: 'youtube#video',
+                                        videoId: videoId,
+                                    },
+                                },
+                            },
+                        });
+                        insertedCount++;
+                        console.log(`[YouTube Route] Retry succeeded for video ${videoId} (item: ${retryRes.data?.id})`);
+                    } catch (retryErr) {
+                        console.warn(`[YouTube Route] Retry insert failed for video ${videoId}:`, retryErr.message);
+                    }
+                }
             }
         }
+
+        console.log(`[YouTube Route] Inserted ${insertedCount}/${videoIds.length} videos into playlist ${playlistId}`);
 
         const playlistUrl = `https://www.youtube.com/playlist?list=${playlistId}`;
         res.json({
             success: true,
-            message: 'Playlist created successfully',
+            message: `YouTube Playlist created with ${insertedCount} tracks`,
             playlistUrl: playlistUrl,
             playlistId: playlistId,
-            videoCount: videoIds.length
+            videoCount: insertedCount,
+            privacyStatus: playlistRes.data.status?.privacyStatus || requestedPrivacy
         });
 
     } catch (error) {
