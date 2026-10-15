@@ -41,7 +41,7 @@ interface ProfileDataType {
 }
 
 export default function ProfilePage() {
-    const { user, logout, loading: authLoading } = useAuth();
+    const { user, logout, loading: authLoading, setUser, refreshUser } = useAuth();
     const router = useRouter();
 
     // --- State ---
@@ -51,6 +51,7 @@ export default function ProfilePage() {
     const [isLoading, setIsLoading] = useState(true);
     const [editingPlaylist, setEditingPlaylist] = useState<SavedPlaylist | null>(null);
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
     // Profile Settings State
     const [profileData, setProfileData] = useState<ProfileDataType>({
@@ -162,10 +163,11 @@ export default function ProfilePage() {
             return;
         }
 
+        setIsUploadingPhoto(true);
         const reader = new FileReader();
         reader.onload = (event) => {
             const img = new Image();
-            img.onload = () => {
+            img.onload = async () => {
                 const canvas = document.createElement('canvas');
                 let width = img.width;
                 let height = img.height;
@@ -188,9 +190,41 @@ export default function ProfilePage() {
                 const ctx = canvas.getContext('2d');
                 ctx?.drawImage(img, 0, 0, width, height);
 
-                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+                // Optimistically update local profile and global auth context state (Header)
                 setProfileData(prev => ({ ...prev, avatarUrl: compressedBase64 }));
-                toast.success("Photo updated!");
+                if (setUser) {
+                    setUser((prev: any) => prev ? { ...prev, avatarUrl: compressedBase64 } : prev);
+                }
+
+                // Immediately persist to backend database so it never vanishes on reload
+                try {
+                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+                    const res = await fetch(`${apiUrl}/api/user/profile`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ avatarUrl: compressedBase64 }),
+                        credentials: 'include'
+                    });
+
+                    if (res.ok) {
+                        toast.success("Profile photo updated & saved! 📸");
+                        if (refreshUser) refreshUser();
+                    } else {
+                        const data = await res.json().catch(() => ({}));
+                        toast.error(data.error || "Failed to save photo to database");
+                    }
+                } catch (saveErr) {
+                    console.error("Failed to save avatar to database:", saveErr);
+                    toast.error("Network error saving photo");
+                } finally {
+                    setIsUploadingPhoto(false);
+                }
+            };
+            img.onerror = () => {
+                toast.error("Failed to read image file");
+                setIsUploadingPhoto(false);
             };
             img.src = event.target?.result as string;
         };
@@ -209,6 +243,10 @@ export default function ProfilePage() {
 
             if (res.ok) {
                 toast.success("Profile updated successfully!");
+                if (setUser) {
+                    setUser((prev: any) => prev ? { ...prev, ...profileData } : prev);
+                }
+                if (refreshUser) refreshUser();
             } else {
                 const data = await res.json();
                 toast.error(data.error || "Failed to update profile");
@@ -334,23 +372,30 @@ export default function ProfilePage() {
 
                 {/* --- Profile Header --- */}
                 <div className="flex flex-col items-center gap-4 py-8">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-primary to-secondary p-[3px] relative group cursor-pointer">
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-primary to-secondary p-[3px] relative group cursor-pointer shadow-lg shadow-purple-500/20">
                         <div className="w-full h-full rounded-full bg-surface-light dark:bg-surface-dark flex items-center justify-center overflow-hidden">
-                            {profileData.avatarUrl ? (
-                                <img src={profileData.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                            {isUploadingPhoto ? (
+                                <div className="flex flex-col items-center justify-center gap-1">
+                                    <span className="material-symbols-outlined text-2xl text-primary animate-spin">progress_activity</span>
+                                    <span className="text-[9px] uppercase font-bold text-muted-foreground">Saving...</span>
+                                </div>
+                            ) : (profileData.avatarUrl || user?.avatarUrl) ? (
+                                <img src={profileData.avatarUrl || user?.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
                             ) : (
-                                <span className="text-4xl font-bold uppercase select-none">{user?.email[0]}</span>
+                                <span className="text-4xl font-bold uppercase select-none">{user?.email?.[0] || 'U'}</span>
                             )}
                         </div>
                         {/* Overlay for upload */}
-                        <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span className="material-symbols-outlined text-white">photo_camera</span>
+                        <div className="absolute inset-0 bg-black/50 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="material-symbols-outlined text-white text-2xl">photo_camera</span>
+                            <span className="text-[10px] text-white font-semibold">Change</span>
                         </div>
                         <input
                             type="file"
                             accept="image/*"
+                            disabled={isUploadingPhoto}
                             onChange={handleImageUpload}
-                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
                             title="Change Profile Photo"
                         />
                     </div>

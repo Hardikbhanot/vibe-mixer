@@ -77,22 +77,42 @@ router.put('/profile', authenticateToken, async (req, res) => {
         const { username, bio, isPublic, isMatchable, avatarUrl } = req.body;
         const userId = req.user.userId;
 
-        // Validation: Username uniqueness check
-        if (username) {
-            const existingUser = await prisma.user.findUnique({ where: { username } });
-            if (existingUser && existingUser.id !== userId) {
-                return res.status(400).json({ error: 'Username already taken' });
+        const dataToUpdate = {};
+
+        if (avatarUrl !== undefined) {
+            dataToUpdate.avatarUrl = avatarUrl;
+        }
+        if (bio !== undefined) {
+            dataToUpdate.bio = bio;
+        }
+        if (isPublic !== undefined) {
+            dataToUpdate.isPublic = isPublic;
+        }
+        if (isMatchable !== undefined) {
+            dataToUpdate.isMatchable = isMatchable;
+        }
+        if (username !== undefined) {
+            const cleanUsername = username ? username.trim().toLowerCase() : null;
+            if (cleanUsername) {
+                const existingUser = await prisma.user.findUnique({ where: { username: cleanUsername } });
+                if (existingUser && existingUser.id !== userId) {
+                    return res.status(400).json({ error: 'Username already taken' });
+                }
+                dataToUpdate.username = cleanUsername;
             }
         }
 
         const updatedUser = await prisma.user.update({
             where: { id: userId },
-            data: {
-                username,
-                bio,
-                isPublic,
-                isMatchable,
-                avatarUrl // Save Base64 string
+            data: dataToUpdate,
+            select: {
+                id: true,
+                email: true,
+                username: true,
+                bio: true,
+                isPublic: true,
+                isMatchable: true,
+                avatarUrl: true
             }
         });
 
