@@ -262,15 +262,45 @@ Date:   Oct 14 2026
 Message: feat(backend): implement sub-second RAG, harmonic vectoring, taste centroid, and batch enrichment
 
 # Spotify Playlist Save Bug Fix & Parallel Resilient Resolver
-commit [PENDING]
+commit 1980722
 Author: Hardik Bhanot
 Date:   Oct 15 2026
 Message: fix(spotify): resolve playlist save failure with parallel guest client resolution and token caching
+
+# Spotify Button Layout & Responsive SVG Icon Fix
+commit 4ebbc41
+Author: Hardik Bhanot
+Date:   Oct 15 2026
+Message: fix(ui): clean Spotify button layout, replace wide wordmark image with responsive SVG icon and prevent text overlap
+
+# YouTube Playlist Export & "Playlist Does Not Exist" Fix
+commit b85519a
+Author: Hardik Bhanot
+Date:   Oct 15 2026
+Message: fix(youtube): resolve 'playlist does not exist' with unlisted status and fix empty playlist track insertions
 ```
 
 ---
 
-## 10. Quick Start Guide for Personal Laptop Antigravity
+## 10. YouTube Playlist Export Architecture (`server/routes/youtube.js`)
+
+### Root Cause Analysis of "Playlist Does Not Exist" & Empty Playlists
+1. **"The Playlist Does Not Exist" Error**:
+   - YouTube API previously set `privacyStatus: 'private'`. In YouTube Data API v3, private playlists return a 404 *"The playlist does not exist."* when visited via a direct link (`https://www.youtube.com/playlist?list=...`) unless the viewer is logged in as the exact YouTube channel inside YouTube Studio.
+   - **Resolution**: Defaulted to `privacyStatus: 'unlisted'` (or respect user toggle `isPublic ? 'public' : 'unlisted'`). Unlisted playlists are accessible to anyone with the link, bypass permission walls, and work seamlessly for unverified OAuth apps without showing in public search results.
+2. **Missing Songs & Blank Playlist Cover**:
+   - In earlier builds, quota exhaustion on user search tokens triggered unhandled errors in fallback search, causing `videoIds` to remain empty while the playlist container was still created.
+   - YouTube assigns playlist cover thumbnails automatically from the **first video** in the playlist; because 0 videos were added, the thumbnail remained a blank gray music note placeholder.
+   - **Resolution**:
+     - Switched to high-throughput concurrent resolution (`Promise.all`) using multi-tier fallback: `track.videoId` -> `scrapeYouTubeVideoId` -> user OAuth `search.list` -> centralized rotator `searchYouTube`.
+     - Validated all video IDs with strict 11-char regex (`/^[a-zA-Z0-9_-]{11}$/`).
+     - Added automatic token refresh listener on `oauth2Client` and mid-insertion `401` retry.
+     - Added per-track insertion logging and actual `insertedCount` verification.
+     - Guarded against empty playlist creation with HTTP 422 if 0 videos resolved.
+
+---
+
+## 11. Quick Start Guide for Personal Laptop Antigravity
 
 When continuing development on your personal laptop:
 
