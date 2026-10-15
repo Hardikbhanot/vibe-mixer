@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useState, useEffect } from 'react';
 import { api } from '@/constants/api';
+import * as ImagePicker from 'expo-image-picker';
 
 // Types (matching web)
 interface SwipeRecord {
@@ -37,7 +38,7 @@ interface ProfileData {
 }
 
 export default function ProfileScreen() {
-    const { user, logout } = useAuth();
+    const { user, logout, loginWithSpotify, loginWithGoogle, spotifyLinked, googleLinked } = useAuth();
     const router = useRouter();
     const theme = Colors['dark'];
 
@@ -58,6 +59,7 @@ export default function ProfileScreen() {
     // Loading States
     const [isSaving, setIsSaving] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
     useEffect(() => {
         if (user) {
@@ -153,13 +155,51 @@ export default function ProfileScreen() {
         }
     }
 
+    const handlePickAvatar = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission needed', 'Camera roll access is required to update your profile photo.');
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.6,
+            base64: true,
+        });
+
+        if (!result.canceled && result.assets?.[0]?.base64) {
+            const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
+            setProfileData(prev => ({ ...prev, avatarUrl: base64Image }));
+            setIsUploadingPhoto(true);
+
+            try {
+                const res = await api.put('/api/user/profile', { avatarUrl: base64Image });
+                if (res && !res.error) {
+                    Alert.alert('Success', 'Profile photo updated!');
+                }
+            } catch (err) {
+                console.error('Failed to auto-save avatar:', err);
+            } finally {
+                setIsUploadingPhoto(false);
+            }
+        }
+    };
+
     // --- RENDERERS ---
 
     const renderHeader = () => (
         <View style={styles.header}>
             <LinearGradient colors={['rgba(0,0,0,0.8)', '#000']} style={StyleSheet.absoluteFill} />
 
-            <View style={styles.avatarContainer}>
+            <TouchableOpacity
+                onPress={handlePickAvatar}
+                activeOpacity={0.8}
+                style={styles.avatarContainer}
+                disabled={isUploadingPhoto}
+            >
                 {profileData.avatarUrl ? (
                     <Image source={{ uri: profileData.avatarUrl }} style={styles.avatarImage} />
                 ) : (
@@ -169,11 +209,18 @@ export default function ProfileScreen() {
                 )}
                 {/* Edit Icon Badge */}
                 <View style={styles.editBadge}>
-                    <FontAwesome name="camera" size={12} color="white" />
+                    {isUploadingPhoto ? (
+                        <ActivityIndicator size="small" color="white" />
+                    ) : (
+                        <FontAwesome name="camera" size={12} color="white" />
+                    )}
                 </View>
-            </View>
+            </TouchableOpacity>
 
             <Text style={styles.name}>{profileData.username || user?.email?.split('@')[0]}</Text>
+            {user?.email ? (
+                <Text style={{ color: '#A1A1AA', fontSize: 13, marginTop: 2 }}>{user.email}</Text>
+            ) : null}
             <Text style={styles.role}>{profileData.bio || "Vibe Curator"}</Text>
 
             {/* Tags */}
@@ -364,6 +411,60 @@ export default function ProfileScreen() {
             >
                 {isSaving ? <ActivityIndicator color="white" /> : <Text style={styles.saveText}>Save Changes</Text>}
             </TouchableOpacity>
+
+            {/* Connected Streaming Services */}
+            <Text style={[styles.sectionTitle, { marginTop: 30, marginBottom: 6 }]}>Connected Services</Text>
+            <Text style={{ color: '#888', fontSize: 13, marginBottom: 16 }}>
+                Link your streaming accounts for 1-click playlist export directly into Spotify and YouTube Music.
+            </Text>
+
+            {/* Spotify Integration Card */}
+            <View style={styles.serviceCard}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={[styles.serviceIconBadge, { backgroundColor: 'rgba(29, 185, 84, 0.15)' }]}>
+                        <FontAwesome name="spotify" size={22} color="#1DB954" />
+                    </View>
+                    <View>
+                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 15 }}>Spotify</Text>
+                        <Text style={{ color: spotifyLinked ? '#1DB954' : '#71717A', fontSize: 12, marginTop: 2 }}>
+                            {spotifyLinked ? '● Connected' : '○ Not Connected'}
+                        </Text>
+                    </View>
+                </View>
+                <TouchableOpacity
+                    style={[styles.serviceBtn, spotifyLinked && styles.serviceBtnConnected]}
+                    onPress={loginWithSpotify}
+                    activeOpacity={0.8}
+                >
+                    <Text style={[styles.serviceBtnText, spotifyLinked && styles.serviceBtnTextConnected]}>
+                        {spotifyLinked ? 'Reconnect' : 'Connect'}
+                    </Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* YouTube Integration Card */}
+            <View style={styles.serviceCard}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={[styles.serviceIconBadge, { backgroundColor: 'rgba(255, 0, 0, 0.15)' }]}>
+                        <FontAwesome name="youtube-play" size={20} color="#FF0000" />
+                    </View>
+                    <View>
+                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 15 }}>YouTube Music</Text>
+                        <Text style={{ color: googleLinked ? '#34D399' : '#71717A', fontSize: 12, marginTop: 2 }}>
+                            {googleLinked ? '● Connected' : '○ Not Connected'}
+                        </Text>
+                    </View>
+                </View>
+                <TouchableOpacity
+                    style={[styles.serviceBtn, googleLinked && styles.serviceBtnConnected]}
+                    onPress={loginWithGoogle}
+                    activeOpacity={0.8}
+                >
+                    <Text style={[styles.serviceBtnText, googleLinked && styles.serviceBtnTextConnected]}>
+                        {googleLinked ? 'Reconnect' : 'Connect'}
+                    </Text>
+                </TouchableOpacity>
+            </View>
 
         </View>
     );
@@ -587,5 +688,43 @@ const styles = StyleSheet.create({
     switchSub: { color: '#666', fontSize: 12 },
     saveButton: { backgroundColor: '#A855F7', padding: 18, borderRadius: 16, alignItems: 'center', marginTop: 20 },
     saveText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+
+    serviceCard: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#111',
+        borderWidth: 1,
+        borderColor: '#262626',
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 12,
+    },
+    serviceIconBadge: {
+        width: 42,
+        height: 42,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    serviceBtn: {
+        paddingHorizontal: 16,
+        paddingVertical: 9,
+        borderRadius: 10,
+        backgroundColor: '#8B5CF6',
+    },
+    serviceBtnConnected: {
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.18)',
+    },
+    serviceBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    serviceBtnTextConnected: {
+        color: '#E4E4E7',
+    },
 
 });

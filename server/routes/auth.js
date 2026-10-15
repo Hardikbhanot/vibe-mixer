@@ -221,7 +221,13 @@ router.post('/login', async (req, res) => {
 
 // Check Auth Status
 router.get('/me', async (req, res) => {
-    const token = req.cookies.auth_token;
+    let token = req.cookies.auth_token;
+    if (!token && req.headers.authorization) {
+        const parts = req.headers.authorization.split(' ');
+        if (parts.length === 2 && (parts[0] === 'Bearer' || parts[0] === 'bearer')) {
+            token = parts[1];
+        }
+    }
     if (!token) return res.status(401).json({ error: 'Not authenticated' });
 
     try {
@@ -231,8 +237,8 @@ router.get('/me', async (req, res) => {
             select: { id: true, email: true, username: true, avatarUrl: true }
         });
         if (!user) return res.status(401).json({ error: 'User not found' });
-        const hasSpotify = !!(req.cookies.spotify_access_token || req.cookies.spotify_refresh_token);
-        const hasGoogle = !!(req.cookies.google_access_token || req.cookies.google_refresh_token);
+        const hasSpotify = !!(req.cookies.spotify_access_token || req.cookies.spotify_refresh_token || req.headers['x-spotify-token']);
+        const hasGoogle = !!(req.cookies.google_access_token || req.cookies.google_refresh_token || req.headers['x-google-token']);
         res.json({ user: { ...user, hasSpotify, hasGoogle } });
     } catch (err) {
         res.status(401).json({ error: 'Invalid token' });
@@ -255,14 +261,16 @@ router.get('/login', (req, res) => {
     console.log('[Spotify Auth] /login called.');
     console.log('[Spotify Auth] Query Params:', req.query);
     const platform = req.query.platform || 'web';
-    const next = req.query.next || req.query.redirect || null;
+    const redirect = req.query.redirect || null;
+    const userId = req.query.userId || null;
+    const next = req.query.next || redirect || null;
     let origin = req.query.origin || null;
     if (!origin && req.headers.referer) {
         try { origin = new URL(req.headers.referer).origin; } catch (e) {}
     }
-    console.log(`[Spotify Auth] Initiating for Platform: ${platform}, Next: ${next}, Origin: ${origin}`);
+    console.log(`[Spotify Auth] Initiating for Platform: ${platform}, Next: ${next}, Origin: ${origin}, Redirect: ${redirect}`);
 
-    const state = Buffer.from(JSON.stringify({ platform, next, origin })).toString('base64');
+    const state = Buffer.from(JSON.stringify({ platform, next, origin, redirect, userId })).toString('base64');
     console.log('[Spotify Auth] Generated State:', state);
 
     const authorizeURL = spotifyApi.createAuthorizeURL(scopes, state, true);
@@ -273,6 +281,15 @@ router.get('/login', (req, res) => {
 router.get('/callback', async (req, res) => {
     console.log('!!! SPOTIFY CALLBACK HIT !!!');
     const { code } = req.query;
+
+    let stateData = null;
+    if (req.query.state) {
+        try {
+            stateData = JSON.parse(Buffer.from(req.query.state, 'base64').toString());
+        } catch (e) {
+            console.error('[Spotify Auth] Failed to parse initial state:', e);
+        }
+    }
 
     try {
         console.log('[Spotify Callback] Code received. Exchanging for token...');
@@ -327,7 +344,14 @@ router.get('/callback', async (req, res) => {
         }
 
         // Find or Create User & Update Vibe Data
-        let user = await prisma.user.findUnique({ where: { email: spotifyEmail } });
+        let user = null;
+        if (stateData && stateData.userId) {
+            user = await prisma.user.findUnique({ where: { id: stateData.userId } });
+            if (user) console.log(`[Spotify Auth] Preserving existing logged-in user: ${user.id} (${user.email})`);
+        }
+        if (!user) {
+            user = await prisma.user.findUnique({ where: { email: spotifyEmail } });
+        }
 
         if (!user) {
             console.log('[Spotify Auth] Creating new user from Spotify...');
@@ -341,9 +365,9 @@ router.get('/callback', async (req, res) => {
                 }
             });
         } else {
-            console.log('[Spotify Auth] Updating existing user vibe data...');
+            console.log('[Spotify Auth] Updating user vibe data...');
             user = await prisma.user.update({
-                where: { email: spotifyEmail },
+                where: { id: user.id },
                 data: {
                     topArtists: topArtistsData,
                     topTracks: topTracksData
@@ -387,20 +411,15 @@ router.get('/callback', async (req, res) => {
         });
 
         // Redirect based on platform
-        console.log('[Spotify Auth] Callback State (Raw):', req.query.state);
+        console.log('[Spotify Auth] Callback State:', stateData);
 
-        if (req.query.state) {
+        if (stateData) {
             try {
-                const stateStr = Buffer.from(req.query.state, 'base64').toString();
-                console.log('[Spotify Auth] Decoded State String:', stateStr);
-
-                const stateData = JSON.parse(stateStr);
-                console.log('[Spotify Auth] Parsed State Data:', stateData);
-                console.log('[Spotify Auth] Platform Check:', stateData.platform, '=== mobile?', stateData.platform === 'mobile');
-
                 if (stateData.platform === 'mobile') {
-                    console.log('[Spotify Auth] Redirecting to Mobile App Scheme (vibemixer://)...');
-                    const mobileRedirectUrl = `vibemixer://auth-callback?spotify_access_token=${access_token}&spotify_refresh_token=${refresh_token}`;
+                    const targetRedirect = stateData.redirect || stateData.next || 'vibemixer://auth-callback';
+                    const sep = targetRedirect.includes('?') ? '&' : '?';
+                    const mobileRedirectUrl = `${targetRedirect}${sep}auth_token=${token}&spotify_access_token=${access_token}&spotify_refresh_token=${refresh_token}`;
+                    console.log('[Spotify Auth] Redirecting to Mobile App Scheme/Target:', mobileRedirectUrl);
                     return res.redirect(mobileRedirectUrl);
                 }
 
@@ -415,7 +434,7 @@ router.get('/callback', async (req, res) => {
                     return res.redirect(`${clientUrl}${target}${sep}spotify_connected=true`);
                 }
             } catch (e) {
-                console.error('[Spotify Auth] Failed to parse state:', e, 'Raw:', req.query.state);
+                console.error('[Spotify Auth] Failed to handle state redirect:', e);
             }
         } else {
             console.log('[Spotify Auth] No state parameter found in callback query.');
@@ -427,10 +446,14 @@ router.get('/callback', async (req, res) => {
     } catch (error) {
         console.error('Error during Spotify authentication:', error);
         let fallbackUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
-        if (req.query.state) {
+        if (stateData) {
             try {
-                const parsed = JSON.parse(Buffer.from(req.query.state, 'base64').toString());
-                if (parsed.origin) fallbackUrl = parsed.origin;
+                if (stateData.platform === 'mobile') {
+                    const target = stateData.redirect || stateData.next || 'vibemixer://auth-callback';
+                    const sep = target.includes('?') ? '&' : '?';
+                    return res.redirect(`${target}${sep}error=spotify_auth_failed`);
+                }
+                if (stateData.origin) fallbackUrl = stateData.origin;
             } catch (e) {}
         }
         res.redirect(`${fallbackUrl}/results?error=auth_failed`);
@@ -463,12 +486,14 @@ router.get('/google', (req, res) => {
     ];
 
     const platform = req.query.platform || 'web';
-    const next = req.query.next || req.query.redirect || null;
+    const redirect = req.query.redirect || null;
+    const userId = req.query.userId || null;
+    const next = req.query.next || redirect || null;
     let origin = req.query.origin || null;
     if (!origin && req.headers.referer) {
         try { origin = new URL(req.headers.referer).origin; } catch (e) {}
     }
-    const state = Buffer.from(JSON.stringify({ platform, next, origin })).toString('base64');
+    const state = Buffer.from(JSON.stringify({ platform, next, origin, redirect, userId })).toString('base64');
 
     const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes.join(' '))}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
 
@@ -481,11 +506,14 @@ router.get('/google/callback', async (req, res) => {
     const code = req.query.code || null;
 
     let fallbackClientUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
+    let stateData = null;
     if (req.query.state) {
         try {
-            const parsed = JSON.parse(Buffer.from(req.query.state, 'base64').toString());
-            if (parsed.origin) fallbackClientUrl = parsed.origin;
-        } catch (e) {}
+            stateData = JSON.parse(Buffer.from(req.query.state, 'base64').toString());
+            if (stateData.origin) fallbackClientUrl = stateData.origin;
+        } catch (e) {
+            console.error('[Google Auth] Failed to parse initial state:', e);
+        }
     }
 
     if (!code) {
@@ -533,7 +561,14 @@ router.get('/google/callback', async (req, res) => {
         }
 
         // Find or Create User
-        let user = await prisma.user.findUnique({ where: { email: googleEmail } });
+        let user = null;
+        if (stateData && stateData.userId) {
+            user = await prisma.user.findUnique({ where: { id: stateData.userId } });
+            if (user) console.log(`[Google Auth] Preserving existing logged-in user: ${user.id} (${user.email})`);
+        }
+        if (!user) {
+            user = await prisma.user.findUnique({ where: { email: googleEmail } });
+        }
 
         if (!user) {
             console.log('[Google Auth] Creating new user from Google...');
@@ -583,20 +618,15 @@ router.get('/google/callback', async (req, res) => {
         }
 
         // Redirect based on platform
-        console.log('[Google Auth] Callback State (Raw):', req.query.state);
+        console.log('[Google Auth] Callback State:', stateData);
 
-        if (req.query.state) {
+        if (stateData) {
             try {
-                const stateStr = Buffer.from(req.query.state, 'base64').toString();
-                console.log('[Google Auth] Decoded State String:', stateStr);
-
-                const stateData = JSON.parse(stateStr);
-                console.log('[Google Auth] Parsed State Data:', stateData);
-                console.log('[Google Auth] Platform Check:', stateData.platform, '=== mobile?', stateData.platform === 'mobile');
-
                 if (stateData.platform === 'mobile') {
-                    console.log('[Google Auth] Redirecting to Mobile App Scheme (vibemixer://)...');
-                    const mobileRedirectUrl = `vibemixer://auth-callback?google_access_token=${access_token}&google_refresh_token=${refresh_token || ''}`;
+                    const targetRedirect = stateData.redirect || stateData.next || 'vibemixer://auth-callback';
+                    const sep = targetRedirect.includes('?') ? '&' : '?';
+                    const mobileRedirectUrl = `${targetRedirect}${sep}auth_token=${token}&google_access_token=${access_token}&google_refresh_token=${refresh_token || ''}`;
+                    console.log('[Google Auth] Redirecting to Mobile App Scheme/Target:', mobileRedirectUrl);
                     return res.redirect(mobileRedirectUrl);
                 }
 
@@ -626,10 +656,14 @@ router.get('/google/callback', async (req, res) => {
     } catch (error) {
         console.error('Google Auth Error:', error);
         let fallbackUrl = process.env.CLIENT_URL || 'http://127.0.0.1:3000';
-        if (req.query.state) {
+        if (stateData) {
             try {
-                const parsed = JSON.parse(Buffer.from(req.query.state, 'base64').toString());
-                if (parsed.origin) fallbackUrl = parsed.origin;
+                if (stateData.platform === 'mobile') {
+                    const target = stateData.redirect || stateData.next || 'vibemixer://auth-callback';
+                    const sep = target.includes('?') ? '&' : '?';
+                    return res.redirect(`${target}${sep}error=google_auth_failed`);
+                }
+                if (stateData.origin) fallbackUrl = stateData.origin;
             } catch (e) {}
         }
         res.redirect(`${fallbackUrl}/results?error=server_error`);

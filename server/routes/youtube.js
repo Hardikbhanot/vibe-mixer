@@ -297,7 +297,17 @@ router.post('/playlist', initYoutubeClient, async (req, res) => {
     }
 });
 
-// Search for Regional Vibe (AI Optimized Search)
+function parseIsoDuration(duration) {
+    if (!duration) return 0;
+    const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (!match) return 0;
+    const hours = parseInt(match[1] || '0', 10);
+    const mins = parseInt(match[2] || '0', 10);
+    const secs = parseInt(match[3] || '0', 10);
+    return hours * 3600 + mins * 60 + secs;
+}
+
+// Search for Regional Vibe (AI Optimized Search - Strictly NO Shorts)
 router.get('/region-vibe', async (req, res) => {
     const { region } = req.query;
 
@@ -325,45 +335,78 @@ router.get('/region-vibe', async (req, res) => {
             console.error('AI Curation failed, using default query', e);
         }
 
-        // 2. Search YouTube (Uses Centralized Rotator)
-        console.log(`[Region Vibe] Searching YouTube with query: "${searchQuery}"`);
+        // 2. Search YouTube with explicit anti-shorts query
+        const refinedQuery = `${searchQuery} official full song audio -shorts -tiktok -reels`.trim();
+        console.log(`[Region Vibe] Searching YouTube with query: "${refinedQuery}"`);
 
         const searchRes = await youtube.search.list({
             part: ['snippet'],
-            q: searchQuery,
-            maxResults: 20, 
+            q: refinedQuery,
+            maxResults: 25, 
             type: 'video',
         });
 
-        if (searchRes.data.items.length > 0) {
-            // Filter out Mashups, Jukeboxes, and Compilations
-            const bannedWords = ['mashup', 'jukebox', 'nonstop', 'collection', 'compilation', 'mix', 'dj'];
+        if (searchRes.data.items && searchRes.data.items.length > 0) {
+            // Strict banned keywords: shorts, reels, status, mashups, compilations
+            const bannedWords = [
+                '#shorts', '#short', 'shorts', 'short', 'reels', 'tiktok',
+                'status', 'whatsapp status', 'short video',
+                'mashup', 'jukebox', 'nonstop', 'collection', 'compilation'
+            ];
 
-            let videos = searchRes.data.items
-                .filter(item => {
-                    const title = item.snippet.title.toLowerCase();
-                    return !bannedWords.some(word => title.includes(word));
-                })
-                .map(item => ({
+            const candidateItems = searchRes.data.items.filter(item => {
+                const title = (item.snippet.title || '').toLowerCase();
+                const desc = (item.snippet.description || '').toLowerCase();
+                const hasBannedWord = bannedWords.some(word => title.includes(word) || desc.includes(word));
+                return !hasBannedWord && item.id?.videoId;
+            });
+
+            const candidateIds = candidateItems.map(i => i.id.videoId);
+
+            // Fetch video details to verify duration (strictly filter out shorts < 75s)
+            let qualifiedVideos = [];
+            if (candidateIds.length > 0) {
+                try {
+                    const videoDetailsRes = await youtube.videos.list({
+                        part: ['contentDetails', 'snippet', 'statistics'],
+                        id: candidateIds
+                    });
+                    
+                    const detailsItems = videoDetailsRes.data?.items || [];
+                    qualifiedVideos = detailsItems.filter(v => {
+                        const durationSec = parseIsoDuration(v.contentDetails?.duration);
+                        const title = (v.snippet?.title || '').toLowerCase();
+                        const desc = (v.snippet?.description || '').toLowerCase();
+
+                        // Must be at least 75 seconds long (strictly NO YouTube shorts)
+                        const isNotShort = durationSec >= 75;
+                        const hasNoShortTag = !title.includes('#short') && !desc.includes('#short') && !title.includes('shorts');
+                        
+                        return isNotShort && hasNoShortTag;
+                    }).map(v => ({
+                        id: v.id,
+                        title: v.snippet.title,
+                        thumbnail: v.snippet.thumbnails?.medium?.url || v.snippet.thumbnails?.default?.url,
+                        channelTitle: v.snippet.channelTitle,
+                        durationSec: parseIsoDuration(v.contentDetails?.duration)
+                    }));
+                } catch (vErr) {
+                    console.warn('[Region Vibe] Could not fetch detailed video durations:', vErr.message);
+                }
+            }
+
+            // Fallback to candidates if video details failed
+            if (qualifiedVideos.length === 0) {
+                qualifiedVideos = candidateItems.map(item => ({
                     id: item.id.videoId,
                     title: item.snippet.title,
-                    thumbnail: item.snippet.thumbnails.medium.url,
-                    channelTitle: item.snippet.channelTitle
-                }));
-
-            // If filtering removed too many, fill back up with original results (to ensure we show something)
-            if (videos.length < 5) {
-                console.log('[Region Vibe] Strict filtering removed too many videos. Relaxing filter.');
-                videos = searchRes.data.items.map(item => ({
-                    id: item.id.videoId,
-                    title: item.snippet.title,
-                    thumbnail: item.snippet.thumbnails.medium.url,
+                    thumbnail: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url,
                     channelTitle: item.snippet.channelTitle
                 }));
             }
 
-            // Limit to 10
-            return res.json({ videos: videos.slice(0, 10) });
+            // Limit to 10 verified full songs
+            return res.json({ videos: qualifiedVideos.slice(0, 10) });
         }
 
         res.status(404).json({ error: 'No vibe found' });

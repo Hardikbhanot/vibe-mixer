@@ -1,7 +1,7 @@
 import { StyleSheet, Image, FlatList, TouchableOpacity, ScrollView, Alert, Linking, Dimensions, Share } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import React, { useState, useEffect } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import Colors from '@/constants/Colors';
@@ -77,7 +77,7 @@ export default function PlaylistDetailsScreen() {
             // 1. Clone to user's library
             const res = await api.post('/api/playlists', {
                 name: playlist.name,
-                description: `Saved from @${playlist.user.username}: ${playlist.description || ''}`,
+                description: `Saved from @${playlist.user?.username || 'vibemixer'}: ${playlist.description || ''}`,
                 coverImage: playlist.coverImage,
                 mood: playlist.mood,
                 tracks: playlist.tracks,
@@ -132,7 +132,16 @@ export default function PlaylistDetailsScreen() {
         }
     };
 
-    const playOnSpotify = (url: string) => {
+    const playOnSpotify = (track: any) => {
+        let url = track?.external_urls?.spotify;
+        if (!url && track?.uri && typeof track.uri === 'string' && track.uri.startsWith('spotify:')) {
+            url = `https://open.spotify.com/track/${track.uri.replace('spotify:track:', '')}`;
+        }
+        if (!url) {
+            const artist = track?.artists?.[0]?.name || track?.artist || '';
+            const name = track?.name || '';
+            url = `https://open.spotify.com/search/${encodeURIComponent(`${name} ${artist}`.trim())}`;
+        }
         Linking.openURL(url).catch(() => Alert.alert("Error", "Could not open Spotify"));
     };
 
@@ -249,7 +258,7 @@ export default function PlaylistDetailsScreen() {
                             <TouchableOpacity onPress={() => playOnYouTube(item.name, item.artists?.[0]?.name)} style={{ padding: 5 }}>
                                 <FontAwesome name="youtube-play" size={24} color="#FF0000" />
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={() => playOnSpotify(item.external_urls?.spotify)} style={{ padding: 5 }}>
+                            <TouchableOpacity onPress={() => playOnSpotify(item)} style={{ padding: 5 }}>
                                 <FontAwesome name="spotify" size={24} color="#1DB954" />
                             </TouchableOpacity>
                         </View>

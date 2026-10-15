@@ -1,7 +1,7 @@
-import { StyleSheet, Image, FlatList, TouchableOpacity, ScrollView, Alert, Linking, Modal } from 'react-native';
+import { StyleSheet, Image, FlatList, TouchableOpacity, ScrollView, Alert, Linking, Modal, Share } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import React, { useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import Colors from '@/constants/Colors';
@@ -38,13 +38,16 @@ export default function GeneratedPlaylistScreen() {
 
     const playOnSpotify = async () => {
         if (!selectedTrack) return;
-        const url = selectedTrack.external_urls?.spotify || `https://open.spotify.com/track/${selectedTrack.id}`;
-        const canOpen = await Linking.canOpenURL(url);
-        if (canOpen) {
-            Linking.openURL(url);
-        } else {
-            Alert.alert("Error", "Cannot open Spotify.");
+        let url = selectedTrack.external_urls?.spotify;
+        if (!url && selectedTrack.uri && typeof selectedTrack.uri === 'string' && selectedTrack.uri.startsWith('spotify:')) {
+            url = `https://open.spotify.com/track/${selectedTrack.uri.replace('spotify:track:', '')}`;
         }
+        if (!url) {
+            const artist = selectedTrack.artist || selectedTrack.artists?.[0]?.name || '';
+            const name = selectedTrack.name || '';
+            url = `https://open.spotify.com/search/${encodeURIComponent(`${name} ${artist}`.trim())}`;
+        }
+        Linking.openURL(url).catch(() => Alert.alert("Error", "Cannot open Spotify."));
         setModalVisible(false);
     };
 
@@ -159,10 +162,15 @@ export default function GeneratedPlaylistScreen() {
         }
     };
 
-    const handleShare = () => {
-        // In a real app with native modules, using react-native-view-shot would be ideal here.
-        // For now, we simulate the action.
-        Alert.alert("Share Story", "Opening Instagram Stories with your vibe card... \n(Placeholder: Implementation requires native view-shot module)");
+    const handleShare = async () => {
+        try {
+            await Share.share({
+                title: playlist_name,
+                message: `Check out my custom AI playlist "${playlist_name}" on VibeMixer!\n${description || ''}\nListen now: https://vibemixer.hbhanot.tech`,
+            });
+        } catch (error) {
+            console.log('Share error', error);
+        }
     };
 
     const renderHeader = () => (

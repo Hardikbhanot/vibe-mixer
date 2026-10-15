@@ -1,12 +1,19 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '@/constants/api';
 import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import * as Store from 'expo-secure-store';
+
+// Notify WebBrowser to complete any pending auth sessions
+WebBrowser.maybeCompleteAuthSession();
 
 type User = {
     id: string;
     email: string;
+    username?: string;
+    avatarUrl?: string;
+    hasSpotify?: boolean;
+    hasGoogle?: boolean;
 };
 
 type AuthContextType = {
@@ -15,8 +22,8 @@ type AuthContextType = {
     login: (email: string, pass: string) => Promise<any>;
     register: (email: string, pass: string) => Promise<any>;
     logout: () => Promise<void>;
-    loginWithSpotify: () => void;
-    loginWithGoogle: () => void;
+    loginWithSpotify: () => Promise<void>;
+    loginWithGoogle: () => Promise<void>;
     spotifyLinked: boolean;
     googleLinked: boolean;
 };
@@ -24,11 +31,11 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType>({
     user: null,
     isLoading: false,
-    login: async () => { },
-    register: async () => { },
+    login: async () => ({ success: false }),
+    register: async () => ({ success: false }),
     logout: async () => { },
-    loginWithSpotify: () => { },
-    loginWithGoogle: () => { },
+    loginWithSpotify: async () => { },
+    loginWithGoogle: async () => { },
     spotifyLinked: false,
     googleLinked: false,
 });
@@ -43,33 +50,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [spotifyLinked, setSpotifyLinked] = useState(false);
     const [googleLinked, setGoogleLinked] = useState(false);
 
-    // Persist session check
+    // Persist session check on startup
     useEffect(() => {
         async function checkUser() {
             try {
-                // Check if we have a token stored
                 const token = await Store.getItemAsync('auth_token');
+                const sToken = await Store.getItemAsync('spotify_access_token');
+                const gToken = await Store.getItemAsync('google_access_token');
+
+                setSpotifyLinked(!!sToken);
+                setGoogleLinked(!!gToken);
+
                 if (token) {
-                    // Validate with backend
                     const res = await api.get('/auth/me');
                     if (res && res.user) {
                         setUser(res.user);
-
-                        // Check Linked Accounts
-                        const sToken = await Store.getItemAsync('spotify_access_token');
-                        const gToken = await Store.getItemAsync('google_access_token');
-                        setSpotifyLinked(!!sToken);
-                        setGoogleLinked(!!gToken);
+                        if (res.user.hasSpotify) setSpotifyLinked(true);
+                        if (res.user.hasGoogle) setGoogleLinked(true);
                     } else {
                         // Token invalid/expired
                         await Store.deleteItemAsync('auth_token');
                         setUser(null);
-                        setSpotifyLinked(false);
-                        setGoogleLinked(false);
                     }
                 }
             } catch (e) {
-                console.error("Session check failed", e);
+                console.error('[Auth] Session check failed:', e);
             } finally {
                 setIsLoading(false);
             }
@@ -77,26 +82,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         checkUser();
     }, []);
 
-    // Deep Link Handler
-    useEffect(() => {
-        const handleDeepLink = async (event: { url: string }) => {
-            const { url } = event;
-            console.log("Deep link received:", url);
-
-            // Parse query params
-            const queryParams = Linking.parse(url).queryParams;
+    // Central redirect URL processor
+    const handleAuthRedirect = async (url: string) => {
+        try {
+            console.log('[Auth] Incoming redirect URL:', url);
+            const parsed = Linking.parse(url);
+            const queryParams = parsed.queryParams;
             if (!queryParams) return;
 
-            // Extract Tokens
+            let updatedSession = false;
+
             if (queryParams.auth_token) {
                 await Store.setItemAsync('auth_token', queryParams.auth_token as string);
-                // Refresh User
-                const res = await api.get('/auth/me');
-                if (res?.user) setUser(res.user);
+                updatedSession = true;
             }
             if (queryParams.spotify_access_token) {
                 await Store.setItemAsync('spotify_access_token', queryParams.spotify_access_token as string);
                 setSpotifyLinked(true);
+                updatedSession = true;
             }
             if (queryParams.spotify_refresh_token) {
                 await Store.setItemAsync('spotify_refresh_token', queryParams.spotify_refresh_token as string);
@@ -104,17 +107,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (queryParams.google_access_token) {
                 await Store.setItemAsync('google_access_token', queryParams.google_access_token as string);
                 setGoogleLinked(true);
+                updatedSession = true;
             }
             if (queryParams.google_refresh_token) {
                 await Store.setItemAsync('google_refresh_token', queryParams.google_refresh_token as string);
             }
+
+            if (updatedSession) {
+                const res = await api.get('/auth/me');
+                if (res && res.user) {
+                    setUser(res.user);
+                    if (res.user.hasSpotify) setSpotifyLinked(true);
+                    if (res.user.hasGoogle) setGoogleLinked(true);
+                }
+            }
+        } catch (e) {
+            console.error('[Auth] Failed to process auth redirect:', e);
+        }
+    };
+
+    // Deep link listener for background / OS-dispatched links
+    useEffect(() => {
+        const handleDeepLink = async (event: { url: string }) => {
+            await handleAuthRedirect(event.url);
         };
 
         const subscription = Linking.addEventListener('url', handleDeepLink);
 
-        // Check initial URL (if app opened via link)
         Linking.getInitialURL().then((url) => {
-            if (url) handleDeepLink({ url });
+            if (url) handleAuthRedirect(url);
         });
 
         return () => subscription.remove();
@@ -145,28 +166,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const logout = async () => {
-        await api.post('/auth/logout', {});
+        try {
+            await api.post('/auth/logout', {});
+        } catch (e) { }
         await Store.deleteItemAsync('auth_token');
         await Store.deleteItemAsync('spotify_access_token');
         await Store.deleteItemAsync('spotify_refresh_token');
         await Store.deleteItemAsync('google_access_token');
         await Store.deleteItemAsync('google_refresh_token');
         setUser(null);
+        setSpotifyLinked(false);
+        setGoogleLinked(false);
     };
 
-    // External OAuth Start
+    // In-App OAuth via WebBrowser Custom Tabs
     const loginWithSpotify = async () => {
-        const authUrl = `${api.baseUrl}/auth/login?platform=mobile`;
-        Linking.openURL(authUrl);
+        try {
+            const redirectUrl = Linking.createURL('auth-callback');
+            console.log('[Spotify OAuth] Using redirect URL:', redirectUrl);
+            const userParam = user?.id ? `&userId=${encodeURIComponent(user.id)}` : '';
+            const authUrl = `${api.baseUrl}/auth/login?platform=mobile&redirect=${encodeURIComponent(redirectUrl)}${userParam}`;
+
+            const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
+            console.log('[Spotify OAuth] WebBrowser result:', result);
+
+            if (result.type === 'success' && result.url) {
+                await handleAuthRedirect(result.url);
+            }
+        } catch (e) {
+            console.error('[Spotify OAuth] Flow failed:', e);
+        }
     };
 
     const loginWithGoogle = async () => {
-        const authUrl = `${api.baseUrl}/auth/google?platform=mobile`;
-        Linking.openURL(authUrl);
+        try {
+            const redirectUrl = Linking.createURL('auth-callback');
+            console.log('[Google OAuth] Using redirect URL:', redirectUrl);
+            const userParam = user?.id ? `&userId=${encodeURIComponent(user.id)}` : '';
+            const authUrl = `${api.baseUrl}/auth/google?platform=mobile&redirect=${encodeURIComponent(redirectUrl)}${userParam}`;
+
+            const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
+            console.log('[Google OAuth] WebBrowser result:', result);
+
+            if (result.type === 'success' && result.url) {
+                await handleAuthRedirect(result.url);
+            }
+        } catch (e) {
+            console.error('[Google OAuth] Flow failed:', e);
+        }
     };
 
     return (
-        <AuthContext.Provider value={{ user, isLoading, login, register, logout, loginWithSpotify, loginWithGoogle, spotifyLinked, googleLinked }}>
+        <AuthContext.Provider value={{
+            user,
+            isLoading,
+            login,
+            register,
+            logout,
+            loginWithSpotify,
+            loginWithGoogle,
+            spotifyLinked,
+            googleLinked
+        }}>
             {children}
         </AuthContext.Provider>
     );
