@@ -364,3 +364,47 @@ When continuing development on your personal laptop:
    cd client
    npm run dev
    ```
+
+---
+
+## 13. Mobile Viewport & Responsive Navigation Overhaul
+
+### Problem Diagnosis
+1. **Desktop Simulation on Mobile Devices**:
+   - On iOS Safari and Android Chrome, the website rendered in zoomed-out desktop emulation mode (simulating ~980px or 1024px).
+   - In Next.js 14+ App Router, `metadata.viewport` is deprecated. If `viewport` is not explicitly exported as an independent `export const viewport: Viewport` configuration or `<meta name="viewport" ...>` tag in the root layout, mobile browsers default to desktop emulation, preventing mobile CSS breakpoints (`<lg`) from activating naturally.
+2. **Horizontal Overflow Bleed**:
+   - Ambient glow blur gradients (`fixed -top-40 ... blur-[150px]`) caused horizontal scroll bounce and overflow on smaller mobile screens.
+3. **Cluttered Mobile Navigation**:
+   - The navigation header was displaying desktop pill buttons and a fragmented mobile menu with mismatched z-indexes (`z-40` overlay under `z-50` header) and uncontained background body scrolling.
+
+### Implementation Details:
+1. **Viewport Configuration** ([`client/app/layout.tsx`](file:///client/app/layout.tsx)):
+   - Added Next.js 14 `Viewport` export:
+     ```typescript
+     export const viewport: Viewport = {
+       width: "device-width",
+       initialScale: 1,
+       maximumScale: 5,
+       themeColor: "#070709",
+     };
+     ```
+   - Injected `<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />` in `<head>`.
+2. **Layout Overflow Containment** ([`client/app/globals.css`](file:///client/app/globals.css)):
+   - Added strict viewport containment:
+     ```css
+     html, body {
+       overflow-x: hidden;
+       max-width: 100vw;
+     }
+     ```
+3. **Responsive Hamburger Navigation Drawer** ([`client/components/Header.tsx`](file:///client/components/Header.tsx)):
+   - **Desktop Navigation**: Preserved sleek horizontal pill nav bar, restricted to `hidden lg:flex`.
+   - **Mobile Hamburger Toggle**: Added modern animated hamburger/close toggle button (`lg:hidden`) with `aria-label` and `aria-expanded` accessibility attributes.
+   - **Full-Featured Mobile Drawer**:
+     - Positioned directly below header (`fixed inset-x-0 top-[57px] bottom-0 z-50`) with backdrop blur (`backdrop-blur-2xl bg-[#070709]/95`).
+     - Automated background scroll locking (`document.body.style.overflow = 'hidden'`) while drawer is open.
+     - **Profile / Auth Card**: Shows user avatar, email address, and quick link to `/profile`, or quick Sign In / Get Started actions.
+     - **Feature Navigation Cards**: Visual list with icons, titles, and descriptions for Studio, Taste Deck, Radar, Community, Vibe Match, and Messages.
+     - **Bottom Utility Bar**: Features one-tap Theme Toggle and Red-accented Sign Out button.
+
