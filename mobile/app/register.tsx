@@ -13,7 +13,7 @@ export default function RegisterScreen() {
     const router = useRouter();
     const { register, loginWithSpotify, loginWithGoogle } = useAuth();
     const colorScheme = useColorScheme();
-    const theme = Colors[colorScheme ?? 'light'];
+    const theme = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');

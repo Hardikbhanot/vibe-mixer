@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
-  color: string;
+  color: any;
 }) {
   return <FontAwesome size={22} style={{ marginBottom: -2 }} {...props} />;
 }
