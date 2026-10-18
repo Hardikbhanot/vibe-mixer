@@ -1,11 +1,10 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
-COPY package*.json ./
+RUN apt-get update -y && apt-get install -y openssl
 
-# Prisma schema must exist before npm ci because
-# npm ci triggers the postinstall script.
+COPY package*.json ./
 COPY prisma ./prisma
 
 RUN npm ci
